@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pipedrive - Deals</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117;
+            color: #e1e4e8;
+            min-height: 100vh;
+        }
+
+        .dashboard { display: block; }
+
+        .topbar {
+            background: #1c1f2b;
+            border-bottom: 1px solid #2d3348;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .topbar h1 { font-size: 18px; color: #fff; }
+
+        .topbar-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn-icon {
+            background: #2d3348;
+            border: none;
+            color: #8b8fa3;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover { background: #3d4460; color: #fff; }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            padding: 24px;
+        }
+
+        .stat-card {
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover { border-color: #4f8ff7; }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+
+        .stat-card.blue::before { background: #4f8ff7; }
+        .stat-card.orange::before { background: #f7954f; }
+        .stat-card.red::before { background: #f74f4f; }
+        .stat-card.purple::before { background: #a855f7; }
+        .stat-card.green::before { background: #22c55e; }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #8b8fa3;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-card .sub {
+            font-size: 12px;
+            color: #8b8fa3;
+            margin-top: 4px;
+        }
+
+        /* Filters */
+        .filters-bar {
+            padding: 0 24px 16px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            color: #8b8fa3;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .date-input {
+            padding: 6px 12px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            border-radius: 8px;
+            color: #e1e4e8;
+            font-size: 13px;
+            color-scheme: dark;
+        }
+
+        .date-input:focus { outline: none; border-color: #4f8ff7; }
+
+        .filter-btn:hover { border-color: #4f8ff7; color: #4f8ff7; }
+        .filter-btn.active {
+            background: #4f8ff7;
+            border-color: #4f8ff7;
+            color: #fff;
+        }
+
+        /* Table */
+        .table-container { padding: 0 24px 24px; }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .table-header h2 { font-size: 16px; color: #fff; }
+        .table-header .count { font-size: 13px; color: #8b8fa3; }
+
+        .search-input {
+            padding: 8px 14px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            border-radius: 8px;
+            color: #e1e4e8;
+            font-size: 13px;
+            width: 280px;
+        }
+
+        .search-input:focus { outline: none; border-color: #4f8ff7; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1c1f2b;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #2d3348;
+        }
+
+        thead th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            color: #8b8fa3;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #2d3348;
+            background: #161825;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        thead th:hover { color: #4f8ff7; }
+
+        tbody tr {
+            border-bottom: 1px solid #2d3348;
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover { background: #22253a; }
+        tbody tr:last-child { border-bottom: none; }
+
+        tbody td {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #c9cdd5;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-blue { background: rgba(79,143,247,0.15); color: #4f8ff7; }
+        .badge-orange { background: rgba(247,149,79,0.15); color: #f7954f; }
+        .badge-red { background: rgba(247,79,79,0.15); color: #f74f4f; }
+        .badge-purple { background: rgba(168,85,247,0.15); color: #a855f7; }
+        .badge-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-gray { background: rgba(139,143,163,0.15); color: #8b8fa3; }
+
+        .link-empty { color: #f74f4f; font-style: italic; }
+        .link-ok a { color: #4f8ff7; text-decoration: none; }
+        .link-ok a:hover { text-decoration: underline; }
+
+        /* Loading */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,17,23,0.85);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .loading-overlay.active { display: flex; }
+
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid #2d3348;
+            border-top-color: #4f8ff7;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #8b8fa3; font-size: 14px; }
+
+        /* Error */
+        .error-msg {
+            background: rgba(247,79,79,0.1);
+            border: 1px solid rgba(247,79,79,0.3);
+            color: #f74f4f;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin: 0 24px 16px;
+            display: none;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px 24px;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            color: #8b8fa3;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:hover { border-color: #4f8ff7; color: #4f8ff7; }
+        .pagination button.active { background: #4f8ff7; border-color: #4f8ff7; color: #fff; }
+        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b8fa3;
+        }
+
+        /* Debug panel */
+        .debug-panel {
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 0 24px 16px;
+            font-size: 12px;
+            font-family: monospace;
+            color: #8b8fa3;
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .debug-panel.active { display: block; }
+        .debug-panel .ok { color: #22c55e; }
+        .debug-panel .warn { color: #f7954f; }
+        .debug-panel .err { color: #f74f4f; }
+
+        /* Config Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,17,23,0.85);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            border-radius: 12px;
+            padding: 32px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 { margin-bottom: 16px; font-size: 18px; color: #fff; }
+
+        .modal label {
+            display: block;
+            font-size: 13px;
+            color: #8b8fa3;
+            margin-bottom: 4px;
+            margin-top: 12px;
+        }
+
+        .modal select, .modal input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            background: #0f1117;
+            border: 1px solid #2d3348;
+            border-radius: 6px;
+            color: #e1e4e8;
+            font-size: 13px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+            justify-content: flex-end;
+        }
+
+        .btn-secondary {
+            padding: 8px 16px;
+            background: #2d3348;
+            border: none;
+            color: #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-save {
+            padding: 8px 16px;
+            background: #4f8ff7;
+            border: none;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .field-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #2d3348;
+            font-size: 12px;
+        }
+
+        .field-item .key { color: #4f8ff7; font-family: monospace; min-width: 160px; }
+        .field-item .name { color: #c9cdd5; }
+
+        .scroll-list {
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #2d3348;
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 8px;
+            background: #0f1117;
+        }
+
+        @media (max-width: 768px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .search-input { width: 100%; }
+            .filters-bar { padding: 0 16px 16px; }
+            .table-container { padding: 0 16px 16px; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard" id="dashboard">
+    <div class="topbar">
+        <h1>Dashboard Pipedrive - Seazone</h1>
+        <div class="topbar-actions">
+            <button class="btn-icon" onclick="toggleDebug()">&#128270; Debug</button>
+            <button class="btn-icon" onclick="openConfig()" title="Configurar campos">&#9881; Campos</button>
+            <button class="btn-icon" onclick="refreshData()">&#8635; Atualizar</button>
+            <button class="btn-icon" onclick="exportCSV()">&#8681; CSV</button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-card blue" onclick="setFilterFromCard('all')">
+            <div class="label">Total Deals Carregados</div>
+            <div class="value" id="statTotal">-</div>
+            <div class="sub">Todos os funis (ou funil selecionado)</div>
+        </div>
+        <div class="stat-card orange" onclick="setFilterFromCard('no-link')">
+            <div class="label">Link de Conversa Vazio</div>
+            <div class="value" id="statNoLink">-</div>
+            <div class="sub">Criados por Automacao/Morada API</div>
+        </div>
+        <div class="stat-card red" onclick="setFilterFromCard('stuck')">
+            <div class="label">Contatados Parados</div>
+            <div class="value" id="statStuck">-</div>
+            <div class="sub">Mais de 12h no estagio</div>
+        </div>
+        <div class="stat-card purple" onclick="setFilterFromCard('cadencia1')">
+            <div class="label">Cadencia Step 1</div>
+            <div class="value" id="statCad1">-</div>
+            <div class="sub">Deals no step 1</div>
+        </div>
+        <div class="stat-card purple" onclick="setFilterFromCard('cadencia2')">
+            <div class="label">Cadencia Step 2</div>
+            <div class="value" id="statCad2">-</div>
+            <div class="sub">Deals no step 2</div>
+        </div>
+        <div class="stat-card purple" onclick="setFilterFromCard('cadencia3')">
+            <div class="label">Cadencia Step 3</div>
+            <div class="value" id="statCad3">-</div>
+            <div class="sub">Deals no step 3</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Filtros:</span>
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">Todos</button>
+        <button class="filter-btn" data-filter="no-link" onclick="setFilter('no-link', this)">Sem Link Conversa</button>
+        <button class="filter-btn" data-filter="stuck" onclick="setFilter('stuck', this)">Contatados Parados</button>
+        <button class="filter-btn" data-filter="cadencia" onclick="setFilter('cadencia', this)">Cadencia (todos)</button>
+        <button class="filter-btn" data-filter="cadencia1" onclick="setFilter('cadencia1', this)">Step 1</button>
+        <button class="filter-btn" data-filter="cadencia2" onclick="setFilter('cadencia2', this)">Step 2</button>
+        <button class="filter-btn" data-filter="cadencia3" onclick="setFilter('cadencia3', this)">Step 3</button>
+    </div>
+    <div class="filters-bar" style="padding-top:0;">
+        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Funil:</span>
+        <button class="filter-btn active" data-pipeline="all" onclick="setPipeline('all', this)">Todos os Funis</button>
+        <span id="pipelineFilters" style="display:contents;"></span>
+    </div>
+    <div class="filters-bar" style="padding-top:0;">
+        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Criado em:</span>
+        <input type="date" id="dateFrom" class="date-input" onchange="applyFilters()" />
+        <span style="color:#8b8fa3;font-size:12px;">ate</span>
+        <input type="date" id="dateTo" class="date-input" onchange="applyFilters()" />
+        <button class="filter-btn" onclick="setDatePreset('today')">Hoje</button>
+        <button class="filter-btn" onclick="setDatePreset('7d')">Ultimos 7 dias</button>
+        <button class="filter-btn" onclick="setDatePreset('30d')">Ultimos 30 dias</button>
+        <button class="filter-btn" onclick="setDatePreset('clear')">Limpar</button>
+    </div>
+
+    <!-- Debug & Error -->
+    <div class="debug-panel" id="debugPanel"></div>
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <div>
+                <h2>Deals</h2>
+                <span class="count" id="tableCount">Carregando...</span>
+            </div>
+            <input type="text" class="search-input" placeholder="Buscar por titulo, pessoa, org..." oninput="onSearch(this.value)" />
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortBy('title')">Titulo</th>
+                    <th onclick="sortBy('person')">Pessoa</th>
+                    <th onclick="sortBy('org')">Organizacao</th>
+                    <th onclick="sortBy('pipeline')">Funil</th>
+                    <th onclick="sortBy('stage')">Estagio</th>
+                    <th onclick="sortBy('owner')">Proprietario</th>
+                    <th onclick="sortBy('link')">Link Conversa</th>
+                    <th onclick="sortBy('stepCadencia')">Step Cadencia</th>
+                    <th onclick="sortBy('dataCadencia')">Ultima Cadencia</th>
+                    <th onclick="sortBy('pularCadencia')">Pular Cadencia</th>
+                    <th onclick="sortBy('add_time')">Criado em</th>
+                </tr>
+            </thead>
+            <tbody id="dealsBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <p>Nenhum deal encontrado com os filtros aplicados.</p>
+        </div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Carregando dados do Pipedrive...</div>
+</div>
+
+<!-- Config Modal -->
+<div class="modal-overlay" id="configModal">
+    <div class="modal">
+        <h2>Configurar Campos Customizados</h2>
+        <p style="font-size:13px; color:#8b8fa3; margin-bottom:16px;">
+            Ajuste os campos customizados se necessario. Os campos foram pre-configurados.
+        </p>
+
+        <label>Campo: Link da Conversa</label>
+        <select id="cfgLinkConversa"></select>
+
+        <label>Campo: Step Cadencia (numerico)</label>
+        <select id="cfgStepCadencia"></select>
+
+        <label>Campo: Data Ultima Cadencia</label>
+        <select id="cfgDataCadencia"></select>
+
+        <label>Campo: Pular Cadencia</label>
+        <select id="cfgPularCadencia"></select>
+
+        <label>Campo: Respondeu MIA</label>
+        <select id="cfgRespondeuMia"></select>
+
+        <label>Nome do estagio "Contatados" (busca parcial)</label>
+        <input type="text" id="cfgContatadosStage" value="Contatados" />
+
+        <label style="margin-top:16px; font-weight:600; color:#fff;">Todos os campos da conta:</label>
+        <div class="scroll-list" id="fieldsList"></div>
+
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeConfig()">Cancelar</button>
+            <button class="btn-save" onclick="saveConfig()">Salvar e Recarregar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const API_KEY = 'd0f4e60217b80d740c8c4c969af4a60108567332';
+const SUBDOMAIN = 'seazone-fd92b9';
+
+// Known user IDs
+const CREATOR_AUTOMACAO_ID = 25546644;  // "Automacao"
+const CREATOR_MORADA_ID = 21490680;     // "Morada - Mia"
+
+// Known custom field keys (from dealFields API)
+const FIELD_KEYS = {
+    linkConversa: '3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc',   // "Link da Conversa" varchar
+    stepCadencia: '90db11111ad88f60a3346d04df252660832285ec',     // "step_cadencia" double
+    dataCadencia: '85b830218feefa6ab8f7186f053a2d84b1b0bd2e',     // "data_ultima_cadencia" date
+    horaCadencia: '166c494761ff67648f584bc0f27c6e031d6dfb86',     // "hora_ultima_cadencia" time
+    pularCadencia: '5502ecbc173d31de563ecb294e5f04e1394091e6',    // "Pular Cadência" set
+    respondeuMia: '34336364766f24e1b2fdb25beec9c87856f3ade3',     // "Respondeu MIA" varchar
+    erroMorada: '805611c38d6e3670376fb93d19027ef62da41f97',       // "Erro Morada" varchar
+    linkReuniao: '3d168fb538411d700912d494cb3ae7d813e2976b',      // "Link da Reunião" varchar
+    cidadeMia: 'c470e77592aace667105d682c28007d10bf429b0',        // "Cidade [MIA]" varchar
+    motivoLostMia: 'bf0e5193f43a49b36990c4ea88c91e01d0858592',   // "Motivo de Lost [MIA]" set
+};
+
+// Only these pipelines
+const ALLOWED_PIPELINES = {
+    28: 'Vendas Spot',
+    14: 'Comercial SZS',
+    44: 'Comercial Decor',
+    37: 'Marketplace',
+};
+
+// Contatados stage name match
+const CONTATADOS_STAGE = 'Contatados';
+
+// ==================== STATE ====================
+let allDeals = [];
+let filteredDeals = [];
+let dealFields = [];
+let stages = {};      // id -> { name, pipeline_id }
+let pipelines = {};   // id -> name
+let users = {};
+let currentFilter = 'all';
+let currentPipeline = 'all';
+let searchTerm = '';
+let sortField = 'add_time';
+let sortDir = 'desc';
+let page = 1;
+const PAGE_SIZE = 50;
+let debugLogs = [];
+
+// ==================== API ====================
+async function apiGet(endpoint, params = {}) {
+    params.api_token = API_KEY;
+    const qs = new URLSearchParams(params).toString();
+    const url = `https://${SUBDOMAIN}.pipedrive.com/api/v1${endpoint}?${qs}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} em ${endpoint}`);
+    return res.json();
+}
+
+async function apiGetAll(endpoint, params = {}) {
+    let all = [];
+    let start = 0;
+    const limit = 500;
+    let pageNum = 0;
+    while (true) {
+        pageNum++;
+        logDebug(`Buscando ${endpoint} pagina ${pageNum} (start=${start})...`);
+        const res = await apiGet(endpoint, { ...params, start, limit });
+        if (res.data) all = all.concat(res.data);
+        if (!res.additional_data || !res.additional_data.pagination || !res.additional_data.pagination.more_items_in_collection) break;
+        start = res.additional_data.pagination.next_start;
+    }
+    logDebug(`${endpoint}: ${all.length} registros carregados`, 'ok');
+    return all;
+}
+
+// ==================== DATA LOADING ====================
+async function refreshData() {
+    debugLogs = [];
+    showLoading('Carregando campos, estagios e usuarios...');
+    logDebug('Iniciando carregamento...');
+
+    try {
+        const [fieldsRes, stagesData, usersData, pipelinesData] = await Promise.all([
+            apiGet('/dealFields', { start: 0, limit: 500 }),
+            apiGetAll('/stages'),
+            apiGetAll('/users'),
+            apiGet('/pipelines')
+        ]);
+
+        dealFields = fieldsRes.data || [];
+        logDebug(`${dealFields.length} deal fields carregados`, 'ok');
+
+        // Build pipelines map
+        pipelines = {};
+        (pipelinesData.data || []).forEach(p => { pipelines[p.id] = p.name; });
+        logDebug(`${Object.keys(pipelines).length} pipelines carregados`, 'ok');
+
+        stages = {};
+        (stagesData || []).forEach(s => { stages[s.id] = { name: s.name, pipeline_id: s.pipeline_id }; });
+
+        users = {};
+        (usersData || []).forEach(u => { users[u.id] = u.name; });
+
+        // Verify known users exist
+        logDebug(`User Automacao (${CREATOR_AUTOMACAO_ID}): "${users[CREATOR_AUTOMACAO_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_AUTOMACAO_ID] ? 'ok' : 'err');
+        logDebug(`User Morada-Mia (${CREATOR_MORADA_ID}): "${users[CREATOR_MORADA_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_MORADA_ID] ? 'ok' : 'err');
+
+        // Verify field keys
+        for (const [name, key] of Object.entries(FIELD_KEYS)) {
+            const field = dealFields.find(f => f.key === key);
+            logDebug(`Campo ${name}: ${field ? '"' + field.name + '" (' + field.field_type + ')' : 'NAO ENCONTRADO'}`, field ? 'ok' : 'warn');
+        }
+
+        // Load ALL open deals from all pipelines
+        showLoading('Carregando todos os deals abertos...');
+        const rawDeals = await apiGetAll('/deals', { status: 'open' });
+        logDebug(`Total de deals abertos: ${rawDeals.length}`);
+
+        // Filter by allowed pipelines only
+        const allowedPipelineIds = Object.keys(ALLOWED_PIPELINES).map(Number);
+        const filtered = rawDeals.filter(d => allowedPipelineIds.includes(d.pipeline_id));
+        logDebug(`Deals nos funis permitidos: ${filtered.length}`, filtered.length > 0 ? 'ok' : 'warn');
+
+        allDeals = filtered.map(normalizeDeal);
+
+        const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
+        const countMorada = allDeals.filter(d => d.isMorada).length;
+        const countOutros = allDeals.filter(d => !d.isAutomacao && !d.isMorada).length;
+        logDebug(`Proprietarios - Automacao: ${countAutomacao}, Morada-Mia: ${countMorada}, Outros: ${countOutros}`, 'ok');
+
+        // Log some sample data
+        if (allDeals.length > 0) {
+            const sample = allDeals[0];
+            logDebug(`Amostra - titulo: "${sample.title}", proprietario: "${sample.owner}", pipeline: "${sample.pipeline}", stage: "${sample.stage}", link: "${sample.link || 'VAZIO'}", step: ${sample.stepCadencia}`);
+        }
+
+        // Render pipeline filter buttons dynamically
+        renderPipelineButtons();
+
+        applyFilters();
+        updateStats();
+        hideLoading();
+    } catch (e) {
+        hideLoading();
+        showError('Erro ao carregar dados: ' + e.message);
+        logDebug('ERRO: ' + e.message, 'err');
+    }
+
+    renderDebug();
+}
+
+function normalizeDeal(d) {
+    const ownerId = d.user_id ? (d.user_id.id || d.user_id) : null;
+    const ownerName = d.user_id ? (d.user_id.name || users[ownerId] || '') : '';
+    const personName = d.person_id ? (d.person_id.name || '') : '';
+    const orgName = d.org_id ? (d.org_id.name || '') : '';
+    const stageInfo = d.stage_id ? (stages[d.stage_id] || { name: `Stage ${d.stage_id}`, pipeline_id: null }) : { name: '', pipeline_id: null };
+    const stageName = typeof stageInfo === 'string' ? stageInfo : stageInfo.name;
+    const pipelineId = d.pipeline_id || (typeof stageInfo === 'object' ? stageInfo.pipeline_id : null);
+    const pipelineName = pipelineId ? (pipelines[pipelineId] || `Pipeline ${pipelineId}`) : '';
+
+    const linkValue = (d[FIELD_KEYS.linkConversa] || '').toString().trim();
+    const stepCadencia = parseFloat(d[FIELD_KEYS.stepCadencia]) || 0;
+    const dataCadencia = d[FIELD_KEYS.dataCadencia] || '';
+    const pularCadencia = d[FIELD_KEYS.pularCadencia] || '';
+    const respondeuMia = d[FIELD_KEYS.respondeuMia] || '';
+
+    // Resolve pularCadencia option label
+    const pularLabel = resolveFieldLabel(FIELD_KEYS.pularCadencia, pularCadencia);
+
+    const isAutomacao = ownerId === CREATOR_AUTOMACAO_ID;
+    const isMorada = ownerId === CREATOR_MORADA_ID;
+    const creatorId = d.creator_user_id ? (d.creator_user_id.id || d.creator_user_id) : null;
+    const createdByApi = creatorId === CREATOR_AUTOMACAO_ID || creatorId === CREATOR_MORADA_ID;
+
+    return {
+        id: d.id,
+        title: d.title || '',
+        person: personName,
+        org: orgName,
+        pipeline: pipelineName,
+        pipelineId,
+        stage: stageName,
+        stageId: d.stage_id,
+        owner: ownerName,
+        ownerId,
+        createdByApi,
+        link: linkValue,
+        stepCadencia,
+        dataCadencia,
+        pularCadencia: pularLabel,
+        respondeuMia,
+        add_time: d.add_time || '',
+        stage_change_time: d.stage_change_time || '',
+        hoursInStage: d.stage_change_time ? ((Date.now() - new Date(d.stage_change_time + ' UTC').getTime()) / 3600000) : 0,
+        isAutomacao,
+        isMorada,
+        raw: d
+    };
+}
+
+function resolveFieldLabel(fieldKey, value) {
+    if (!fieldKey || !value) return String(value || '');
+    const field = dealFields.find(f => f.key === fieldKey);
+    if (!field || !field.options) return String(value || '');
+    const ids = String(value).split(',');
+    const labels = ids.map(id => {
+        const opt = field.options.find(o => String(o.id) === id.trim());
+        return opt ? opt.label : id.trim();
+    });
+    return labels.join(', ');
+}
+
+// ==================== FILTERS ====================
+function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    else {
+        document.querySelectorAll('[data-filter]').forEach(b => {
+            if (b.dataset.filter === filter) b.classList.add('active');
+        });
+    }
+    page = 1;
+    applyFilters();
+}
+
+function setPipeline(pipelineId, btn) {
+    currentPipeline = pipelineId;
+    document.querySelectorAll('[data-pipeline]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    page = 1;
+    applyFilters();
+}
+
+function setFilterFromCard(filter) {
+    setFilter(filter, null);
+}
+
+function renderPipelineButtons() {
+    // Find which pipelines have deals
+    const pipelineIds = [...new Set(allDeals.map(d => d.pipelineId).filter(Boolean))];
+    const container = document.getElementById('pipelineFilters');
+    container.innerHTML = pipelineIds.map(pid => {
+        const name = pipelines[pid] || `Pipeline ${pid}`;
+        const count = allDeals.filter(d => d.pipelineId === pid).length;
+        return `<button class="filter-btn" data-pipeline="${pid}" onclick="setPipeline(${pid}, this)">${escapeHtml(name)} (${count})</button>`;
+    }).join('');
+}
+
+function setDatePreset(preset) {
+    const from = document.getElementById('dateFrom');
+    const to = document.getElementById('dateTo');
+    const today = new Date().toISOString().slice(0, 10);
+
+    switch (preset) {
+        case 'today':
+            from.value = today;
+            to.value = today;
+            break;
+        case '7d':
+            from.value = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+            to.value = today;
+            break;
+        case '30d':
+            from.value = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+            to.value = today;
+            break;
+        case 'clear':
+            from.value = '';
+            to.value = '';
+            break;
+    }
+    page = 1;
+    applyFilters();
+}
+
+function onSearch(val) {
+    searchTerm = val.toLowerCase().trim();
+    page = 1;
+    applyFilters();
+}
+
+// Shared filter functions — used by both stats and table
+// no-link: todos os proprietarios; demais: apenas Automacao/Morada-Mia
+const FILTERS = {
+    'no-link': d => d.createdByApi && !d.link,
+    'stuck': d => (d.isAutomacao || d.isMorada) && d.stage.toLowerCase().includes(CONTATADOS_STAGE.toLowerCase()) && d.hoursInStage > 12,
+    'cadencia': d => (d.isAutomacao || d.isMorada) && d.stepCadencia > 0,
+    'cadencia1': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 1,
+    'cadencia2': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 2,
+    'cadencia3': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 3,
+};
+
+// Filters that show ALL owners (not restricted to Automacao/Morada)
+const ALL_OWNERS_FILTERS = new Set(['all']);
+
+function getBaseDeals(forFilter) {
+    let base = [...allDeals];
+    // Pipeline filter
+    if (currentPipeline !== 'all') {
+        base = base.filter(d => d.pipelineId === currentPipeline);
+    }
+    // Date filter
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    if (dateFrom) {
+        base = base.filter(d => d.add_time >= dateFrom);
+    }
+    if (dateTo) {
+        base = base.filter(d => d.add_time <= dateTo + 'T23:59:59');
+    }
+    // Owner filter: unless it's a filter that shows all owners
+    if (!ALL_OWNERS_FILTERS.has(forFilter)) {
+        base = base.filter(d => d.isAutomacao || d.isMorada);
+    }
+    return base;
+}
+
+function applyFilters() {
+    let result = getBaseDeals(currentFilter);
+
+    // Category filter
+    if (currentFilter !== 'all' && FILTERS[currentFilter]) {
+        result = result.filter(FILTERS[currentFilter]);
+    }
+
+    if (searchTerm) {
+        result = result.filter(d =>
+            d.title.toLowerCase().includes(searchTerm) ||
+            d.person.toLowerCase().includes(searchTerm) ||
+            d.org.toLowerCase().includes(searchTerm) ||
+            d.owner.toLowerCase().includes(searchTerm) ||
+            d.stage.toLowerCase().includes(searchTerm) ||
+            d.pipeline.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    result.sort((a, b) => {
+        let va = a[sortField] ?? '';
+        let vb = b[sortField] ?? '';
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    filteredDeals = result;
+    updateStats();
+    renderTable();
+    renderPagination();
+    document.getElementById('tableCount').textContent = `${result.length} deal(s) encontrado(s)`;
+}
+
+function sortBy(field) {
+    if (sortField === field) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortField = field;
+        sortDir = field === 'add_time' ? 'desc' : 'asc';
+    }
+    applyFilters();
+}
+
+// ==================== RENDER ====================
+function renderTable() {
+    const tbody = document.getElementById('dealsBody');
+    const start = (page - 1) * PAGE_SIZE;
+    const pageDeals = filteredDeals.slice(start, start + PAGE_SIZE);
+
+    if (pageDeals.length === 0) {
+        tbody.innerHTML = '';
+        document.getElementById('emptyState').style.display = 'block';
+        return;
+    }
+
+    document.getElementById('emptyState').style.display = 'none';
+
+    tbody.innerHTML = pageDeals.map(d => {
+        const linkCell = d.link
+            ? `<td class="link-ok"><a href="${escapeHtml(d.link)}" target="_blank" title="${escapeHtml(d.link)}">${truncate(d.link, 30)}</a></td>`
+            : `<td class="link-empty">Vazio</td>`;
+
+        const ownerBadge = d.isAutomacao
+            ? '<span class="badge badge-blue">Automacao</span>'
+            : d.isMorada
+            ? '<span class="badge badge-orange">Morada - Mia</span>'
+            : `<span class="badge badge-gray">${escapeHtml(truncate(d.owner, 20))}</span>`;
+
+        const stepBadge = d.stepCadencia > 0
+            ? `<span class="badge badge-purple">Step ${d.stepCadencia}</span>`
+            : '<span class="badge badge-gray">-</span>';
+
+        const pularBadge = d.pularCadencia && d.pularCadencia !== '-'
+            ? `<span class="badge badge-red">${escapeHtml(d.pularCadencia)}</span>`
+            : '<span class="badge badge-gray">-</span>';
+
+        const date = d.add_time ? new Date(d.add_time).toLocaleDateString('pt-BR') : '-';
+        const dataCad = d.dataCadencia ? new Date(d.dataCadencia).toLocaleDateString('pt-BR') : '-';
+
+        return `<tr>
+            <td title="${escapeHtml(d.title)}"><a href="https://${SUBDOMAIN}.pipedrive.com/deal/${d.id}" target="_blank" style="color:#4f8ff7;text-decoration:none;">${escapeHtml(truncate(d.title, 35))}</a></td>
+            <td title="${escapeHtml(d.person)}">${escapeHtml(truncate(d.person, 25))}</td>
+            <td title="${escapeHtml(d.org)}">${escapeHtml(truncate(d.org, 25))}</td>
+            <td><span class="badge badge-green">${escapeHtml(truncate(d.pipeline, 20))}</span></td>
+            <td>${escapeHtml(d.stage)}</td>
+            <td>${ownerBadge}</td>
+            ${linkCell}
+            <td>${stepBadge}</td>
+            <td>${dataCad}</td>
+            <td>${pularBadge}</td>
+            <td>${date}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderPagination() {
+    const total = Math.ceil(filteredDeals.length / PAGE_SIZE);
+    const container = document.getElementById('pagination');
+    if (total <= 1) { container.innerHTML = ''; return; }
+
+    let html = `<button ${page <= 1 ? 'disabled' : ''} onclick="goPage(${page - 1})">&laquo;</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (total > 7 && Math.abs(i - page) > 2 && i !== 1 && i !== total) {
+            if (i === page - 3 || i === page + 3) html += '<button disabled>...</button>';
+            continue;
+        }
+        html += `<button class="${i === page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+    }
+    html += `<button ${page >= total ? 'disabled' : ''} onclick="goPage(${page + 1})">&raquo;</button>`;
+    container.innerHTML = html;
+}
+
+function goPage(p) {
+    page = p;
+    renderTable();
+    renderPagination();
+    window.scrollTo({ top: document.querySelector('.table-container').offsetTop - 20, behavior: 'smooth' });
+}
+
+// ==================== STATS ====================
+function updateStats() {
+    const baseOwner = getBaseDeals('stuck'); // filtered by Automacao/Morada
+
+    document.getElementById('statTotal').textContent = baseOwner.length;
+    document.getElementById('statNoLink').textContent = baseOwner.filter(FILTERS['no-link']).length;
+    document.getElementById('statStuck').textContent = baseOwner.filter(FILTERS['stuck']).length;
+    document.getElementById('statCad1').textContent = baseOwner.filter(FILTERS['cadencia1']).length;
+    document.getElementById('statCad2').textContent = baseOwner.filter(FILTERS['cadencia2']).length;
+    document.getElementById('statCad3').textContent = baseOwner.filter(FILTERS['cadencia3']).length;
+}
+
+// ==================== CONFIG MODAL ====================
+function openConfig() {
+    const modal = document.getElementById('configModal');
+    modal.classList.add('active');
+
+    const customFields = dealFields.filter(f => f.key && f.key.length > 10);
+    const selects = [
+        { id: 'cfgLinkConversa', current: FIELD_KEYS.linkConversa },
+        { id: 'cfgStepCadencia', current: FIELD_KEYS.stepCadencia },
+        { id: 'cfgDataCadencia', current: FIELD_KEYS.dataCadencia },
+        { id: 'cfgPularCadencia', current: FIELD_KEYS.pularCadencia },
+        { id: 'cfgRespondeuMia', current: FIELD_KEYS.respondeuMia },
+    ];
+
+    selects.forEach(({ id, current }) => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">-- Nenhum --</option>';
+        customFields.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.key;
+            opt.textContent = `${f.name} (${f.field_type})`;
+            if (current === f.key) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    });
+
+    const list = document.getElementById('fieldsList');
+    list.innerHTML = dealFields.map(f =>
+        `<div class="field-item"><span class="key">${escapeHtml(f.key)}</span><span class="name">${escapeHtml(f.name)} (${f.field_type})</span></div>`
+    ).join('');
+}
+
+function closeConfig() { document.getElementById('configModal').classList.remove('active'); }
+
+async function saveConfig() {
+    FIELD_KEYS.linkConversa = document.getElementById('cfgLinkConversa').value;
+    FIELD_KEYS.stepCadencia = document.getElementById('cfgStepCadencia').value;
+    FIELD_KEYS.dataCadencia = document.getElementById('cfgDataCadencia').value;
+    FIELD_KEYS.pularCadencia = document.getElementById('cfgPularCadencia').value;
+    FIELD_KEYS.respondeuMia = document.getElementById('cfgRespondeuMia').value;
+    closeConfig();
+    await refreshData();
+}
+
+// ==================== EXPORT ====================
+function exportCSV() {
+    if (filteredDeals.length === 0) return;
+
+    const headers = ['Titulo', 'Pessoa', 'Organizacao', 'Funil', 'Estagio', 'Proprietario', 'Link Conversa', 'Step Cadencia', 'Data Cadencia', 'Pular Cadencia', 'Respondeu MIA', 'Criado em', 'Deal ID', 'Link Pipedrive'];
+    const rows = filteredDeals.map(d => [
+        d.title, d.person, d.org, d.pipeline, d.stage, d.owner,
+        d.link, d.stepCadencia, d.dataCadencia, d.pularCadencia,
+        d.respondeuMia, d.add_time, d.id,
+        `https://${SUBDOMAIN}.pipedrive.com/deal/${d.id}`
+    ]);
+
+    const csv = [headers, ...rows].map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `deals_pipedrive_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==================== DEBUG ====================
+function logDebug(msg, level = '') {
+    debugLogs.push({ msg, level });
+}
+
+function renderDebug() {
+    const panel = document.getElementById('debugPanel');
+    panel.innerHTML = debugLogs.map(l =>
+        `<div class="${l.level}">[${new Date().toLocaleTimeString('pt-BR')}] ${escapeHtml(l.msg)}</div>`
+    ).join('');
+}
+
+function toggleDebug() {
+    const panel = document.getElementById('debugPanel');
+    panel.classList.toggle('active');
+}
+
+// ==================== HELPERS ====================
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loading').classList.add('active');
+}
+
+function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+
+function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 10000);
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function truncate(str, len) {
+    return str.length > len ? str.slice(0, len) + '...' : str;
+}
+
+// ==================== INIT ====================
+refreshData();
+</script>
+</body>
+</html>
