@@ -1135,6 +1135,28 @@ function truncate(str, len) {
     return str.length > len ? str.slice(0, len) + '...' : str;
 }
 
+// ==================== AUTO-REFRESH ====================
+// Refresh every 60 minutes
+setInterval(() => { refreshData(); }, 60 * 60 * 1000);
+
+// Schedule refresh at 8:00 AM every day
+function scheduleAt8AM() {
+    const now = new Date();
+    const next8 = new Date(now);
+    next8.setHours(8, 0, 0, 0);
+    if (now >= next8) next8.setDate(next8.getDate() + 1);
+    const ms = next8 - now;
+    setTimeout(() => {
+        refreshData();
+        // After firing, schedule for next day
+        setInterval(() => { refreshData(); }, 24 * 60 * 60 * 1000);
+    }, ms);
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    logDebug(`Proximo refresh automatico as 8h em ${h}h${m}m`);
+}
+scheduleAt8AM();
+
 // ==================== INIT ====================
 refreshData();
 </script>
