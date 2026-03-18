@@ -866,7 +866,7 @@ const FILTERS = {
 };
 
 // Filters that show ALL owners (not restricted to Automacao/Morada)
-const ALL_OWNERS_FILTERS = new Set(['all']);
+const ALL_OWNERS_FILTERS = new Set(['all', 'no-link']);
 
 function getBaseDeals(forFilter) {
     let base = [...allDeals];
@@ -1014,10 +1014,12 @@ function goPage(p) {
 
 // ==================== STATS ====================
 function updateStats() {
+    const baseAll = getBaseDeals('all');
     const baseOwner = getBaseDeals('stuck'); // filtered by Automacao/Morada
+    const baseNoLink = getBaseDeals('no-link'); // all owners (createdByApi check is in FILTERS)
 
-    document.getElementById('statTotal').textContent = baseOwner.length;
-    document.getElementById('statNoLink').textContent = baseOwner.filter(FILTERS['no-link']).length;
+    document.getElementById('statTotal').textContent = baseAll.length;
+    document.getElementById('statNoLink').textContent = baseNoLink.filter(FILTERS['no-link']).length;
     document.getElementById('statStuck').textContent = baseOwner.filter(FILTERS['stuck']).length;
     document.getElementById('statCad1').textContent = baseOwner.filter(FILTERS['cadencia1']).length;
     document.getElementById('statCad2').textContent = baseOwner.filter(FILTERS['cadencia2']).length;
