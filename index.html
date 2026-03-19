@@ -753,9 +753,12 @@ async function refreshData() {
                 if (acts.length === 0) break;
                 for (const act of acts) {
                     if (!act.deal_id || !act.subject) continue;
-                    if (act.subject.includes('Tentativa de contato pela MIA') && act.subject.includes('Sucesso')) {
-                        cadenciaStepMap[act.deal_id] = (cadenciaStepMap[act.deal_id] || 0) + 1;
-                    }
+                    if (!act.subject.includes('Tentativa de contato pela MIA')) continue;
+                    // Extract attempt number from subject (e.g. "1ª", "2ª", "3ª")
+                    const match = act.subject.match(/^(\d+)ª/);
+                    if (!match) continue;
+                    const attemptNum = parseInt(match[1], 10);
+                    cadenciaStepMap[act.deal_id] = Math.max(cadenciaStepMap[act.deal_id] || 0, attemptNum);
                 }
                 if (!res.additional_data?.pagination?.more_items_in_collection) break;
                 start = res.additional_data.pagination.next_start;
@@ -802,9 +805,10 @@ function normalizeDeal(d) {
     const pipelineName = pipelineId ? (pipelines[pipelineId] || `Pipeline ${pipelineId}`) : '';
 
     const linkValue = (d[FIELD_KEYS.linkConversa] || '').toString().trim();
-    // Use computed step from activities (last 4 days) if available, fallback to field
-    const msgCount = cadenciaStepMap[d.id] || 0;
-    const stepCadencia = msgCount >= 5 ? 2 : msgCount >= 2 ? 1 : (parseFloat(d[FIELD_KEYS.stepCadencia]) || 0);
+    // Use max attempt number from activities (last 4 days) to determine cadencia step
+    // 1ª Tentativa = cadencia 1, 2ª Tentativa = cadencia 2
+    const maxAttempt = cadenciaStepMap[d.id] || 0;
+    const stepCadencia = maxAttempt >= 2 ? 2 : maxAttempt >= 1 ? 1 : (parseFloat(d[FIELD_KEYS.stepCadencia]) || 0);
     const dataCadencia = d[FIELD_KEYS.dataCadencia] || '';
     const pularCadencia = d[FIELD_KEYS.pularCadencia] || '';
     const respondeuMia = d[FIELD_KEYS.respondeuMia] || '';
