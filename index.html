@@ -459,10 +459,10 @@
             <div class="value" id="statCad2">-</div>
             <div class="sub">Deals no step 2</div>
         </div>
-        <div class="stat-card purple" onclick="setFilterFromCard('cadencia3')">
-            <div class="label">Cadencia Step 3</div>
-            <div class="value" id="statCad3">-</div>
-            <div class="sub">Deals no step 3</div>
+        <div class="stat-card purple" onclick="setFilterFromCard('transferidos')">
+            <div class="label">Transferidos pos Cadencia</div>
+            <div class="value" id="statTransferidos">-</div>
+            <div class="sub">Cadencia 2 concluida, novo proprietario</div>
         </div>
     </div>
 
@@ -476,7 +476,7 @@
         <button class="filter-btn" data-filter="cadencia" onclick="setFilter('cadencia', this)">Cadencia (todos)</button>
         <button class="filter-btn" data-filter="cadencia1" onclick="setFilter('cadencia1', this)">Step 1</button>
         <button class="filter-btn" data-filter="cadencia2" onclick="setFilter('cadencia2', this)">Step 2</button>
-        <button class="filter-btn" data-filter="cadencia3" onclick="setFilter('cadencia3', this)">Step 3</button>
+        <button class="filter-btn" data-filter="transferidos" onclick="setFilter('transferidos', this)">Transferidos</button>
     </div>
     <div class="filters-bar" style="padding-top:0;">
         <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Funil:</span>
@@ -885,11 +885,11 @@ const FILTERS = {
     'cadencia': d => (d.isAutomacao || d.isMorada) && d.stepCadencia > 0,
     'cadencia1': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 1,
     'cadencia2': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 2,
-    'cadencia3': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 3,
+    'transferidos': d => d.createdByApi && d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada,
 };
 
 // Filters that show ALL owners (not restricted to Automacao/Morada)
-const ALL_OWNERS_FILTERS = new Set(['all', 'no-link', 'confirmacao']);
+const ALL_OWNERS_FILTERS = new Set(['all', 'no-link', 'confirmacao', 'transferidos']);
 
 function getBaseDeals(forFilter) {
     let base = [...allDeals];
@@ -1047,7 +1047,8 @@ function updateStats() {
     document.getElementById('statStuck').textContent = baseOwner.filter(FILTERS['stuck']).length;
     document.getElementById('statCad1').textContent = baseOwner.filter(FILTERS['cadencia1']).length;
     document.getElementById('statCad2').textContent = baseOwner.filter(FILTERS['cadencia2']).length;
-    document.getElementById('statCad3').textContent = baseOwner.filter(FILTERS['cadencia3']).length;
+    const baseTransferidos = getBaseDeals('transferidos');
+    document.getElementById('statTransferidos').textContent = baseTransferidos.filter(FILTERS['transferidos']).length;
 }
 
 // ==================== CONFIG MODAL ====================
