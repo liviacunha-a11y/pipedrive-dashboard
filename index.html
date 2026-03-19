@@ -630,6 +630,7 @@ let sortDir = 'desc';
 let page = 1;
 const PAGE_SIZE = 50;
 let confirmacaoDeals = new Set(); // deal IDs with confirmation note today
+let cadenciaStepMap = {};          // deal_id -> computed cadencia step from activities
 let debugLogs = [];
 
 // ==================== API ====================
@@ -722,6 +723,23 @@ async function refreshData() {
         }
         logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
 
+        // Load cadencia activities (last 4 days) to compute real step per deal
+        showLoading('Carregando atividades de cadencia...');
+        const fourDaysAgo = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+        const cadenciaActivities = await apiGetAll('/activities', {
+            user_id: CREATOR_AUTOMACAO_ID,
+            sort: 'add_time DESC',
+            done: 1
+        });
+        cadenciaStepMap = {};
+        for (const act of cadenciaActivities) {
+            if (!act.deal_id || !act.subject || !act.add_time) continue;
+            if (act.add_time.slice(0, 10) < fourDaysAgo) continue;
+            if (!act.subject.includes('Tentativa de contato pela MIA') || !act.subject.includes('Sucesso')) continue;
+            cadenciaStepMap[act.deal_id] = (cadenciaStepMap[act.deal_id] || 0) + 1;
+        }
+        logDebug(`Cadencia calculada (ultimos 4 dias): ${Object.keys(cadenciaStepMap).length} deals com atividades`, 'ok');
+
         allDeals = filtered.map(normalizeDeal);
 
         const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
@@ -761,7 +779,9 @@ function normalizeDeal(d) {
     const pipelineName = pipelineId ? (pipelines[pipelineId] || `Pipeline ${pipelineId}`) : '';
 
     const linkValue = (d[FIELD_KEYS.linkConversa] || '').toString().trim();
-    const stepCadencia = parseFloat(d[FIELD_KEYS.stepCadencia]) || 0;
+    // Use computed step from activities (last 4 days) if available, fallback to field
+    const msgCount = cadenciaStepMap[d.id] || 0;
+    const stepCadencia = msgCount >= 5 ? 2 : msgCount >= 2 ? 1 : (parseFloat(d[FIELD_KEYS.stepCadencia]) || 0);
     const dataCadencia = d[FIELD_KEYS.dataCadencia] || '';
     const pularCadencia = d[FIELD_KEYS.pularCadencia] || '';
     const respondeuMia = d[FIELD_KEYS.respondeuMia] || '';
