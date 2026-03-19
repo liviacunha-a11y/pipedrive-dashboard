@@ -609,9 +609,11 @@ const ALLOWED_PIPELINES = {
 // Contatados stage name match
 const CONTATADOS_STAGE = 'Contatados';
 
-// Label IDs for meeting confirmation
-const LABEL_CONFIRMACAO_AGENDAMENTO = '4686';   // "Confirmação de Agendamento via Automação"
-const LABEL_CONFIRMACAO_REAGENDAMENTO = '4825';  // "CONFIRMAÇÃO REAGENDAMENTO VIA AUTOMAÇÃO"
+// Note patterns for meeting confirmation (n8n flow)
+const CONFIRMACAO_NOTE_PATTERNS = [
+    'Confirmação de Agendamento via automação',
+    'Confirmação de Reagendamento via automação',
+];
 
 // ==================== STATE ====================
 let allDeals = [];
@@ -627,6 +629,7 @@ let sortField = 'add_time';
 let sortDir = 'desc';
 let page = 1;
 const PAGE_SIZE = 50;
+let confirmacaoDeals = new Set(); // deal IDs with confirmation note today
 let debugLogs = [];
 
 // ==================== API ====================
@@ -704,6 +707,21 @@ async function refreshData() {
         const filtered = rawDeals.filter(d => allowedPipelineIds.includes(d.pipeline_id));
         logDebug(`Deals nos funis permitidos: ${filtered.length}`, filtered.length > 0 ? 'ok' : 'warn');
 
+        // Load today's confirmation notes
+        showLoading('Carregando notas de confirmacao...');
+        const today = new Date().toISOString().slice(0, 10);
+        const allNotes = await apiGetAll('/notes', { sort: 'add_time DESC' });
+        confirmacaoDeals = new Set();
+        for (const note of allNotes) {
+            if (!note.deal_id || !note.content || !note.add_time) continue;
+            if (note.add_time.slice(0, 10) !== today) continue;
+            const content = note.content.replace(/<[^>]*>/g, ''); // strip HTML tags
+            if (CONFIRMACAO_NOTE_PATTERNS.some(p => content.includes(p))) {
+                confirmacaoDeals.add(note.deal_id);
+            }
+        }
+        logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
+
         allDeals = filtered.map(normalizeDeal);
 
         const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
@@ -756,10 +774,8 @@ function normalizeDeal(d) {
     const creatorId = d.creator_user_id ? (d.creator_user_id.id || d.creator_user_id) : null;
     const createdByApi = creatorId === CREATOR_AUTOMACAO_ID || creatorId === CREATOR_MORADA_ID;
 
-    // Label / confirmation check
-    const labelIds = d.label ? String(d.label).split(',') : [];
-    const hasConfirmacao = labelIds.includes(LABEL_CONFIRMACAO_AGENDAMENTO) || labelIds.includes(LABEL_CONFIRMACAO_REAGENDAMENTO);
-    const updateTime = d.update_time || '';
+    // Confirmation check (based on notes loaded in refreshData)
+    const hasConfirmacao = confirmacaoDeals.has(d.id);
 
     return {
         id: d.id,
@@ -779,7 +795,6 @@ function normalizeDeal(d) {
         pularCadencia: pularLabel,
         respondeuMia,
         add_time: d.add_time || '',
-        update_time: updateTime,
         stage_change_time: d.stage_change_time || '',
         hoursInStage: d.stage_change_time ? ((Date.now() - new Date(d.stage_change_time + ' UTC').getTime()) / 3600000) : 0,
         hasConfirmacao,
@@ -873,14 +888,9 @@ function onSearch(val) {
 
 // Shared filter functions — used by both stats and table
 // no-link: todos os proprietarios; demais: apenas Automacao/Morada-Mia
-function isToday(dateStr) {
-    if (!dateStr) return false;
-    return dateStr.slice(0, 10) === new Date().toISOString().slice(0, 10);
-}
-
 const FILTERS = {
     'no-link': d => d.createdByApi && !d.link,
-    'confirmacao': d => d.hasConfirmacao && isToday(d.update_time),
+    'confirmacao': d => d.hasConfirmacao,
     'stuck': d => (d.isAutomacao || d.isMorada) && d.stage.toLowerCase().includes(CONTATADOS_STAGE.toLowerCase()) && d.hoursInStage > 12,
     'cadencia': d => (d.isAutomacao || d.isMorada) && d.stepCadencia > 0,
     'cadencia1': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 1,
