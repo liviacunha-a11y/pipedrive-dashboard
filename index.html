@@ -708,35 +708,60 @@ async function refreshData() {
         const filtered = rawDeals.filter(d => allowedPipelineIds.includes(d.pipeline_id));
         logDebug(`Deals nos funis permitidos: ${filtered.length}`, filtered.length > 0 ? 'ok' : 'warn');
 
-        // Load today's confirmation notes
+        // Load today's confirmation notes (paginated, stop when past today)
         showLoading('Carregando notas de confirmacao...');
         const today = new Date().toISOString().slice(0, 10);
-        const allNotes = await apiGetAll('/notes', { sort: 'add_time DESC' });
         confirmacaoDeals = new Set();
-        for (const note of allNotes) {
-            if (!note.deal_id || !note.content || !note.add_time) continue;
-            if (note.add_time.slice(0, 10) !== today) continue;
-            const content = note.content.replace(/<[^>]*>/g, ''); // strip HTML tags
-            if (CONFIRMACAO_NOTE_PATTERNS.some(p => content.includes(p))) {
-                confirmacaoDeals.add(note.deal_id);
+        {
+            let start = 0;
+            const limit = 500;
+            let done = false;
+            while (!done) {
+                const res = await apiGet('/notes', { sort: 'add_time DESC', start, limit });
+                const notes = res.data || [];
+                if (notes.length === 0) break;
+                for (const note of notes) {
+                    if (!note.add_time) continue;
+                    if (note.add_time.slice(0, 10) < today) { done = true; break; }
+                    if (!note.deal_id || !note.content) continue;
+                    const content = note.content.replace(/<[^>]*>/g, '');
+                    if (CONFIRMACAO_NOTE_PATTERNS.some(p => content.includes(p))) {
+                        confirmacaoDeals.add(note.deal_id);
+                    }
+                }
+                if (!res.additional_data?.pagination?.more_items_in_collection) break;
+                start = res.additional_data.pagination.next_start;
             }
         }
         logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
 
-        // Load cadencia activities (last 4 days) to compute real step per deal
+        // Load cadencia activities (last 4 days, stop when past cutoff)
         showLoading('Carregando atividades de cadencia...');
         const fourDaysAgo = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
-        const cadenciaActivities = await apiGetAll('/activities', {
-            user_id: CREATOR_AUTOMACAO_ID,
-            sort: 'add_time DESC',
-            done: 1
-        });
         cadenciaStepMap = {};
-        for (const act of cadenciaActivities) {
-            if (!act.deal_id || !act.subject || !act.add_time) continue;
-            if (act.add_time.slice(0, 10) < fourDaysAgo) continue;
-            if (!act.subject.includes('Tentativa de contato pela MIA') || !act.subject.includes('Sucesso')) continue;
-            cadenciaStepMap[act.deal_id] = (cadenciaStepMap[act.deal_id] || 0) + 1;
+        {
+            let start = 0;
+            const limit = 500;
+            let done = false;
+            while (!done) {
+                const res = await apiGet('/activities', {
+                    user_id: CREATOR_AUTOMACAO_ID,
+                    sort: 'add_time DESC',
+                    start, limit
+                });
+                const acts = res.data || [];
+                if (acts.length === 0) break;
+                for (const act of acts) {
+                    if (!act.add_time) continue;
+                    if (act.add_time.slice(0, 10) < fourDaysAgo) { done = true; break; }
+                    if (!act.deal_id || !act.subject) continue;
+                    if (act.subject.includes('Tentativa de contato pela MIA') && act.subject.includes('Sucesso')) {
+                        cadenciaStepMap[act.deal_id] = (cadenciaStepMap[act.deal_id] || 0) + 1;
+                    }
+                }
+                if (!res.additional_data?.pagination?.more_items_in_collection) break;
+                start = res.additional_data.pagination.next_start;
+            }
         }
         logDebug(`Cadencia calculada (ultimos 4 dias): ${Object.keys(cadenciaStepMap).length} deals com atividades`, 'ok');
 
