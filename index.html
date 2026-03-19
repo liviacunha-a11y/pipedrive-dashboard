@@ -439,6 +439,11 @@
             <div class="value" id="statNoLink">-</div>
             <div class="sub">Criados por Automacao/Morada API</div>
         </div>
+        <div class="stat-card green" onclick="setFilterFromCard('confirmacao')">
+            <div class="label">Confirmacao Reuniao Hoje</div>
+            <div class="value" id="statConfirmacao">-</div>
+            <div class="sub">Agendamento/reagendamento confirmado</div>
+        </div>
         <div class="stat-card red" onclick="setFilterFromCard('stuck')">
             <div class="label">Contatados Parados</div>
             <div class="value" id="statStuck">-</div>
@@ -466,6 +471,7 @@
         <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Filtros:</span>
         <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">Todos</button>
         <button class="filter-btn" data-filter="no-link" onclick="setFilter('no-link', this)">Sem Link Conversa</button>
+        <button class="filter-btn" data-filter="confirmacao" onclick="setFilter('confirmacao', this)">Confirmacao Reuniao</button>
         <button class="filter-btn" data-filter="stuck" onclick="setFilter('stuck', this)">Contatados Parados</button>
         <button class="filter-btn" data-filter="cadencia" onclick="setFilter('cadencia', this)">Cadencia (todos)</button>
         <button class="filter-btn" data-filter="cadencia1" onclick="setFilter('cadencia1', this)">Step 1</button>
@@ -602,6 +608,10 @@ const ALLOWED_PIPELINES = {
 
 // Contatados stage name match
 const CONTATADOS_STAGE = 'Contatados';
+
+// Label IDs for meeting confirmation
+const LABEL_CONFIRMACAO_AGENDAMENTO = '4686';   // "Confirmação de Agendamento via Automação"
+const LABEL_CONFIRMACAO_REAGENDAMENTO = '4825';  // "CONFIRMAÇÃO REAGENDAMENTO VIA AUTOMAÇÃO"
 
 // ==================== STATE ====================
 let allDeals = [];
@@ -746,6 +756,11 @@ function normalizeDeal(d) {
     const creatorId = d.creator_user_id ? (d.creator_user_id.id || d.creator_user_id) : null;
     const createdByApi = creatorId === CREATOR_AUTOMACAO_ID || creatorId === CREATOR_MORADA_ID;
 
+    // Label / confirmation check
+    const labelIds = d.label ? String(d.label).split(',') : [];
+    const hasConfirmacao = labelIds.includes(LABEL_CONFIRMACAO_AGENDAMENTO) || labelIds.includes(LABEL_CONFIRMACAO_REAGENDAMENTO);
+    const updateTime = d.update_time || '';
+
     return {
         id: d.id,
         title: d.title || '',
@@ -764,8 +779,10 @@ function normalizeDeal(d) {
         pularCadencia: pularLabel,
         respondeuMia,
         add_time: d.add_time || '',
+        update_time: updateTime,
         stage_change_time: d.stage_change_time || '',
         hoursInStage: d.stage_change_time ? ((Date.now() - new Date(d.stage_change_time + ' UTC').getTime()) / 3600000) : 0,
+        hasConfirmacao,
         isAutomacao,
         isMorada,
         raw: d
@@ -856,8 +873,14 @@ function onSearch(val) {
 
 // Shared filter functions — used by both stats and table
 // no-link: todos os proprietarios; demais: apenas Automacao/Morada-Mia
+function isToday(dateStr) {
+    if (!dateStr) return false;
+    return dateStr.slice(0, 10) === new Date().toISOString().slice(0, 10);
+}
+
 const FILTERS = {
     'no-link': d => d.createdByApi && !d.link,
+    'confirmacao': d => d.hasConfirmacao && isToday(d.update_time),
     'stuck': d => (d.isAutomacao || d.isMorada) && d.stage.toLowerCase().includes(CONTATADOS_STAGE.toLowerCase()) && d.hoursInStage > 12,
     'cadencia': d => (d.isAutomacao || d.isMorada) && d.stepCadencia > 0,
     'cadencia1': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 1,
@@ -866,7 +889,7 @@ const FILTERS = {
 };
 
 // Filters that show ALL owners (not restricted to Automacao/Morada)
-const ALL_OWNERS_FILTERS = new Set(['all', 'no-link']);
+const ALL_OWNERS_FILTERS = new Set(['all', 'no-link', 'confirmacao']);
 
 function getBaseDeals(forFilter) {
     let base = [...allDeals];
@@ -1019,6 +1042,8 @@ function updateStats() {
 
     document.getElementById('statTotal').textContent = baseOwner.length;
     document.getElementById('statNoLink').textContent = baseNoLink.filter(FILTERS['no-link']).length;
+    const baseConfirmacao = getBaseDeals('confirmacao');
+    document.getElementById('statConfirmacao').textContent = baseConfirmacao.filter(FILTERS['confirmacao']).length;
     document.getElementById('statStuck').textContent = baseOwner.filter(FILTERS['stuck']).length;
     document.getElementById('statCad1').textContent = baseOwner.filter(FILTERS['cadencia1']).length;
     document.getElementById('statCad2').textContent = baseOwner.filter(FILTERS['cadencia2']).length;
