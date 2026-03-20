@@ -577,8 +577,8 @@
 
 <script>
 // ==================== CONFIG ====================
-const MCP_URL = 'https://nekt-mcp.seazone.com.br/mcp';
-const JWT_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZWt0LW1jcC1zZXJ2ZXIiLCJpc3MiOiJodHRwczovL3d3dy5uZWt0LmNvbSIsImlhdCI6MTc3NDAxODA4MiwiZXhwIjoxODA1MTIyMDgyLCJhdWQiOiJuZWt0LW1jcC1zZXJ2ZXIiLCJzY29wZSI6InJlYWQgd3JpdGUifQ.kp2HwZnzEFtfgMOsYvmCMQZxdUziMcdcHwp06q6jlSnmyCR9sZ0cK_x1gy-mYQvMweJpdnheFGO7P851Wd3RooVg6pg_ExNyNmM9G3GKLY5ICFrkF8gKlHoQS-1o58fdAo-yfpG6-Cr8yzDSGza03XPXz987WGUdwp5FW90f-yVzEw1iAZXswA8jInIS-6Am1LrnH5slz7A65k8gZlSi3D12TC6VRjLRN1Qg_O4dyFoFPQDHAWXPPPSrmawur_MNgaSqoAmObFMue1UW-Gh2T45GjWBvvmUDAexTJyJlSl4fqysoMvATnSQntGl4P7SzbjdUbdgIeI26UwLmWIuePg';
+const NEKT_API_URL = 'https://api.nekt.ai/api/v1/sql-query/';
+const NEKT_API_KEY = 'TF7hnGP1pxcxCLofkC1gaySaqEWg8BbbawWzniVUI2lccGvZqigw81uXY1DsVlW2zYYezyW1QQydT0hmCI6DmoSmkbUrSgwL9pM5MtOmbBDS1QiP2Z4mk4cXs037gdrA1xoQbiHw2BqXsfGSACfRlfYRTdTfylNoIvPQAG61COK0N636CIRhJShpE2xjlzUxlowWFejN0sy8GiWJM4rGCTqFdnwH6A5MTWsZggYjsQjb4J0xkaD5WEtWdkd88Chq';
 const SUBDOMAIN = 'seazone-fd92b9';
 
 // Known user IDs
@@ -612,188 +612,66 @@ const PAGE_SIZE = 50;
 let confirmacaoDeals = new Set(); // deal IDs with confirmation note today
 let cadenciaStepMap = {};          // deal_id -> computed cadencia step from activities
 let debugLogs = [];
-let mcpSessionId = null;
-let mcpRequestId = 0;
 
-// ==================== MCP API ====================
-async function mcpInitialize() {
-    mcpRequestId = 0;
-    const id = ++mcpRequestId;
-    logDebug('Inicializando sessao MCP...');
-    const res = await fetch(MCP_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${JWT_TOKEN}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        },
-        body: JSON.stringify({
-            jsonrpc: '2.0',
-            id,
-            method: 'initialize',
-            params: {
-                protocolVersion: '2024-11-05',
-                capabilities: {},
-                clientInfo: { name: 'dashboard', version: '1.0.0' }
-            }
-        })
-    });
-
-    if (!res.ok) throw new Error(`MCP initialize HTTP ${res.status}`);
-
-    mcpSessionId = res.headers.get('Mcp-Session-Id');
-    if (!mcpSessionId) {
-        // Try to parse from SSE body
-        const text = await res.text();
-        logDebug('MCP init response (no session header), parsing body...');
-        // Some servers return session ID in the response body
-        const parsed = parseSseResponse(text);
-        if (parsed && parsed.result && parsed.result.sessionId) {
-            mcpSessionId = parsed.result.sessionId;
-        }
-    } else {
-        // Consume the body
-        await res.text();
+// ==================== NEKT DATA API ====================
+function parseCSV(text) {
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return [];
+    // Parse header
+    const headers = parseCSVLine(lines[0]);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+        rows.push(obj);
     }
-
-    logDebug(`MCP sessao inicializada: ${mcpSessionId ? mcpSessionId.substring(0, 20) + '...' : 'sem session ID (usando headers)'}`, 'ok');
+    return rows;
 }
 
-function parseSseResponse(text) {
-    // SSE format: lines starting with "data: " contain JSON
-    const lines = text.split('\n');
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
-            try {
-                return JSON.parse(trimmed.substring(6));
-            } catch (e) {
-                // continue to next line
-            }
-        }
-        // Also try parsing the whole text as JSON (non-SSE response)
-        if (trimmed.startsWith('{')) {
-            try {
-                return JSON.parse(trimmed);
-            } catch (e) {
-                // continue
-            }
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+            if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+            else if (ch === '"') { inQuotes = false; }
+            else { current += ch; }
+        } else {
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === ',') { result.push(current); current = ''; }
+            else { current += ch; }
         }
     }
-    // Last resort: try parsing the whole text as JSON
-    try {
-        return JSON.parse(text);
-    } catch (e) {
-        return null;
-    }
+    result.push(current);
+    return result;
 }
 
-async function mcpExecuteSql(sql, pageToken) {
-    const id = ++mcpRequestId;
-    const args = { sql_query: sql };
-    if (pageToken) args.page_token = pageToken;
-
-    const headers = {
-        'Authorization': `Bearer ${JWT_TOKEN}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream'
-    };
-    if (mcpSessionId) {
-        headers['Mcp-Session-Id'] = mcpSessionId;
-    }
-
-    const res = await fetch(MCP_URL, {
+async function nektQuery(sql, label) {
+    logDebug(`${label}: executando query...`);
+    const res = await fetch(NEKT_API_URL, {
         method: 'POST',
-        headers,
-        body: JSON.stringify({
-            jsonrpc: '2.0',
-            id,
-            method: 'tools/call',
-            params: {
-                name: 'execute_sql',
-                arguments: args
-            }
-        })
+        headers: { 'Content-Type': 'application/json', 'x-api-key': NEKT_API_KEY },
+        body: JSON.stringify({ sql })
     });
-
     if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`MCP SQL HTTP ${res.status}: ${errText.substring(0, 200)}`);
+        throw new Error(`Nekt API ${res.status}: ${errText.substring(0, 200)}`);
     }
-
-    // Update session ID if returned
-    const newSessionId = res.headers.get('Mcp-Session-Id');
-    if (newSessionId) mcpSessionId = newSessionId;
-
-    const text = await res.text();
-    const parsed = parseSseResponse(text);
-
-    if (!parsed) throw new Error('Falha ao parsear resposta MCP SSE');
-    if (parsed.error) throw new Error(`MCP erro: ${parsed.error.message || JSON.stringify(parsed.error)}`);
-
-    const result = parsed.result;
-    if (!result) throw new Error('Resposta MCP sem result');
-
-    // Check if there's structuredContent
-    if (result.structuredContent) {
-        return result.structuredContent;
+    const json = await res.json();
+    if (json.state === 'FAILED') throw new Error(`SQL erro: ${json.state_change_reason || 'desconhecido'}`);
+    if (json.state !== 'SUCCEEDED' || !json.presigned_urls || json.presigned_urls.length === 0) {
+        throw new Error(`Nekt query estado inesperado: ${json.state}`);
     }
-
-    // Try parsing from content text
-    if (result.content && result.content.length > 0) {
-        for (const item of result.content) {
-            if (item.type === 'text' && item.text) {
-                try {
-                    return JSON.parse(item.text);
-                } catch (e) {
-                    // not JSON
-                }
-            }
-        }
-    }
-
-    throw new Error('Resposta MCP sem dados estruturados');
-}
-
-async function mcpExecuteSqlAll(sql, label) {
-    let allRows = [];
-    let columns = null;
-    let pageToken = null;
-    let pageNum = 0;
-
-    while (true) {
-        pageNum++;
-        if (pageNum > 1) logDebug(`${label}: buscando pagina ${pageNum}...`);
-        const result = await mcpExecuteSql(sql, pageToken);
-
-        if (!columns && result.columns) columns = result.columns;
-
-        if (result.data) {
-            allRows = allRows.concat(result.data);
-        }
-
-        if (result.data_truncated && result.next_page_token) {
-            pageToken = result.next_page_token;
-        } else {
-            break;
-        }
-    }
-
-    logDebug(`${label}: ${allRows.length} registros carregados`, 'ok');
-    return { columns: columns || [], data: allRows };
-}
-
-// Helper to convert column-based result to array of objects
-function resultToObjects(result) {
-    const { columns, data } = result;
-    if (!columns || !data) return [];
-    return data.map(row => {
-        const obj = {};
-        columns.forEach((col, i) => {
-            obj[col] = row[i];
-        });
-        return obj;
-    });
+    // Download CSV from presigned URL
+    const csvRes = await fetch(json.presigned_urls[0]);
+    if (!csvRes.ok) throw new Error(`Erro ao baixar CSV: ${csvRes.status}`);
+    const csvText = await csvRes.text();
+    const rows = parseCSV(csvText);
+    logDebug(`${label}: ${rows.length} registros carregados (${Math.round(json.data_scanned_in_bytes / 1024)}KB scanned, ${json.execution_time_in_millis}ms)`, 'ok');
+    return rows;
 }
 
 // ==================== DATA LOADING ====================
@@ -803,26 +681,17 @@ async function refreshData() {
     logDebug('Iniciando carregamento via Nekt MCP...');
 
     try {
-        // Initialize MCP session
-        await mcpInitialize();
-
-        // Load stages, users, deals, notes, and activities in parallel
+        // Load stages, users in parallel
         showLoading('Carregando estagios e usuarios...');
 
-        const [stagesResult, usersResult] = await Promise.all([
-            mcpExecuteSqlAll(
-                `SELECT id, name, pipeline_id FROM nekt_trusted.pipedrive_szs_stages WHERE active_flag = true`,
-                'Stages'
-            ),
-            mcpExecuteSqlAll(
-                `SELECT id, name FROM nekt_trusted.pipedrive_v2_users WHERE active_flag = true`,
-                'Users'
-            )
+        const [stagesRows, usersRows] = await Promise.all([
+            nektQuery(`SELECT id, name, pipeline_id FROM nekt_trusted.pipedrive_szs_stages WHERE active_flag = true`, 'Stages'),
+            nektQuery(`SELECT id, name FROM nekt_trusted.pipedrive_v2_users WHERE active_flag = true`, 'Users')
         ]);
 
         // Build stages map
         stages = {};
-        resultToObjects(stagesResult).forEach(s => {
+        stagesRows.forEach(s => {
             const id = parseInt(s.id, 10);
             stages[id] = { name: s.name || '', pipeline_id: parseInt(s.pipeline_id, 10) || null };
         });
@@ -834,7 +703,7 @@ async function refreshData() {
 
         // Build users map
         users = {};
-        resultToObjects(usersResult).forEach(u => {
+        usersRows.forEach(u => {
             const id = parseInt(u.id, 10);
             users[id] = u.name || '';
         });
@@ -846,7 +715,7 @@ async function refreshData() {
 
         // Load deals with custom fields + person/org names via JOIN
         showLoading('Carregando deals abertos...');
-        const dealsResult = await mcpExecuteSqlAll(
+        const dealsRows = await nektQuery(
             `SELECT d.id, d.title, d.creator_user_id, d.owner_id, d.pipeline_id, d.stage_id, d.status, d.add_time, d.update_time, d.stage_change_time, d.person_id, d.org_id, d.label_ids,
   d.custom_fields."3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc" AS link_conversa,
   d.custom_fields."90db11111ad88f60a3346d04df252660832285ec" AS step_cadencia,
@@ -861,25 +730,25 @@ LEFT JOIN nekt_trusted.pipedrive_v2_organizations o ON d.org_id = o.id
 WHERE d.status = 'open' AND d.pipeline_id IN (28, 14, 44, 37)`,
             'Deals'
         );
-        logDebug(`Total de deals abertos nos funis permitidos: ${dealsResult.data.length}`, dealsResult.data.length > 0 ? 'ok' : 'warn');
+        logDebug(`Total de deals abertos nos funis permitidos: ${dealsRows.length}`, dealsRows.length > 0 ? 'ok' : 'warn');
 
         // Load today's confirmation notes
         showLoading('Carregando notas de confirmacao...');
-        const notesResult = await mcpExecuteSqlAll(
+        const notesRows = await nektQuery(
             `SELECT DISTINCT deal_id FROM nekt_trusted.pipedrive_v2_notes
 WHERE CAST(add_time AS DATE) = CURRENT_DATE
 AND (content LIKE '%Confirmação de Agendamento via automação%' OR content LIKE '%Confirmação de Reagendamento via automação%')`,
             'Notas confirmacao'
         );
         confirmacaoDeals = new Set();
-        resultToObjects(notesResult).forEach(n => {
+        notesRows.forEach(n => {
             if (n.deal_id) confirmacaoDeals.add(parseInt(n.deal_id, 10));
         });
         logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
 
         // Load cadencia activities (last 4 days)
         showLoading('Carregando atividades de cadencia...');
-        const activitiesResult = await mcpExecuteSqlAll(
+        const activitiesRows = await nektQuery(
             `SELECT deal_id, subject FROM nekt_trusted.pipedrive_v2_activities
 WHERE user_id = 25546644
 AND CAST(add_time AS DATE) >= CURRENT_DATE - INTERVAL '4' DAY
@@ -887,7 +756,7 @@ AND subject LIKE '%Tentativa de contato pela MIA%'`,
             'Atividades cadencia'
         );
         cadenciaStepMap = {};
-        resultToObjects(activitiesResult).forEach(act => {
+        activitiesRows.forEach(act => {
             if (!act.deal_id || !act.subject) return;
             const match = act.subject.match(/^(\d+)/);
             if (!match) return;
@@ -898,8 +767,7 @@ AND subject LIKE '%Tentativa de contato pela MIA%'`,
         logDebug(`Cadencia calculada (ultimos 4 dias): ${Object.keys(cadenciaStepMap).length} deals com atividades`, 'ok');
 
         // Normalize deals
-        const rawDeals = resultToObjects(dealsResult);
-        allDeals = rawDeals.map(normalizeDeal);
+        allDeals = dealsRows.map(normalizeDeal);
 
         const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
         const countMorada = allDeals.filter(d => d.isMorada).length;
