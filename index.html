@@ -577,26 +577,13 @@
 
 <script>
 // ==================== CONFIG ====================
-const API_KEY = 'd0f4e60217b80d740c8c4c969af4a60108567332';
+const MCP_URL = 'https://nekt-mcp.seazone.com.br/mcp';
+const JWT_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZWt0LW1jcC1zZXJ2ZXIiLCJpc3MiOiJodHRwczovL3d3dy5uZWt0LmNvbSIsImlhdCI6MTc3NDAxODA4MiwiZXhwIjoxODA1MTIyMDgyLCJhdWQiOiJuZWt0LW1jcC1zZXJ2ZXIiLCJzY29wZSI6InJlYWQgd3JpdGUifQ.kp2HwZnzEFtfgMOsYvmCMQZxdUziMcdcHwp06q6jlSnmyCR9sZ0cK_x1gy-mYQvMweJpdnheFGO7P851Wd3RooVg6pg_ExNyNmM9G3GKLY5ICFrkF8gKlHoQS-1o58fdAo-yfpG6-Cr8yzDSGza03XPXz987WGUdwp5FW90f-yVzEw1iAZXswA8jInIS-6Am1LrnH5slz7A65k8gZlSi3D12TC6VRjLRN1Qg_O4dyFoFPQDHAWXPPPSrmawur_MNgaSqoAmObFMue1UW-Gh2T45GjWBvvmUDAexTJyJlSl4fqysoMvATnSQntGl4P7SzbjdUbdgIeI26UwLmWIuePg';
 const SUBDOMAIN = 'seazone-fd92b9';
 
 // Known user IDs
 const CREATOR_AUTOMACAO_ID = 25546644;  // "Automacao"
 const CREATOR_MORADA_ID = 21490680;     // "Morada - Mia"
-
-// Known custom field keys (from dealFields API)
-const FIELD_KEYS = {
-    linkConversa: '3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc',   // "Link da Conversa" varchar
-    stepCadencia: '90db11111ad88f60a3346d04df252660832285ec',     // "step_cadencia" double
-    dataCadencia: '85b830218feefa6ab8f7186f053a2d84b1b0bd2e',     // "data_ultima_cadencia" date
-    horaCadencia: '166c494761ff67648f584bc0f27c6e031d6dfb86',     // "hora_ultima_cadencia" time
-    pularCadencia: '5502ecbc173d31de563ecb294e5f04e1394091e6',    // "Pular Cadência" set
-    respondeuMia: '34336364766f24e1b2fdb25beec9c87856f3ade3',     // "Respondeu MIA" varchar
-    erroMorada: '805611c38d6e3670376fb93d19027ef62da41f97',       // "Erro Morada" varchar
-    linkReuniao: '3d168fb538411d700912d494cb3ae7d813e2976b',      // "Link da Reunião" varchar
-    cidadeMia: 'c470e77592aace667105d682c28007d10bf429b0',        // "Cidade [MIA]" varchar
-    motivoLostMia: 'bf0e5193f43a49b36990c4ea88c91e01d0858592',   // "Motivo de Lost [MIA]" set
-};
 
 // Only these pipelines
 const ALLOWED_PIPELINES = {
@@ -609,18 +596,11 @@ const ALLOWED_PIPELINES = {
 // Contatados stage name match
 const CONTATADOS_STAGE = 'Contatados';
 
-// Note patterns for meeting confirmation (n8n flow)
-const CONFIRMACAO_NOTE_PATTERNS = [
-    'Confirmação de Agendamento via automação',
-    'Confirmação de Reagendamento via automação',
-];
-
 // ==================== STATE ====================
 let allDeals = [];
 let filteredDeals = [];
-let dealFields = [];
 let stages = {};      // id -> { name, pipeline_id }
-let pipelines = {};   // id -> name
+let pipelines = {};   // id -> name (from ALLOWED_PIPELINES)
 let users = {};
 let currentFilter = 'all';
 let currentPipeline = 'all';
@@ -632,156 +612,307 @@ const PAGE_SIZE = 50;
 let confirmacaoDeals = new Set(); // deal IDs with confirmation note today
 let cadenciaStepMap = {};          // deal_id -> computed cadencia step from activities
 let debugLogs = [];
+let mcpSessionId = null;
+let mcpRequestId = 0;
 
-// ==================== API ====================
-async function apiGet(endpoint, params = {}) {
-    params.api_token = API_KEY;
-    const qs = new URLSearchParams(params).toString();
-    const url = `https://${SUBDOMAIN}.pipedrive.com/api/v1${endpoint}?${qs}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} em ${endpoint}`);
-    return res.json();
+// ==================== MCP API ====================
+async function mcpInitialize() {
+    mcpRequestId = 0;
+    const id = ++mcpRequestId;
+    logDebug('Inicializando sessao MCP...');
+    const res = await fetch(MCP_URL, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${JWT_TOKEN}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream'
+        },
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            method: 'initialize',
+            params: {
+                protocolVersion: '2024-11-05',
+                capabilities: {},
+                clientInfo: { name: 'dashboard', version: '1.0.0' }
+            }
+        })
+    });
+
+    if (!res.ok) throw new Error(`MCP initialize HTTP ${res.status}`);
+
+    mcpSessionId = res.headers.get('Mcp-Session-Id');
+    if (!mcpSessionId) {
+        // Try to parse from SSE body
+        const text = await res.text();
+        logDebug('MCP init response (no session header), parsing body...');
+        // Some servers return session ID in the response body
+        const parsed = parseSseResponse(text);
+        if (parsed && parsed.result && parsed.result.sessionId) {
+            mcpSessionId = parsed.result.sessionId;
+        }
+    } else {
+        // Consume the body
+        await res.text();
+    }
+
+    logDebug(`MCP sessao inicializada: ${mcpSessionId ? mcpSessionId.substring(0, 20) + '...' : 'sem session ID (usando headers)'}`, 'ok');
 }
 
-async function apiGetAll(endpoint, params = {}) {
-    let all = [];
-    let start = 0;
-    const limit = 500;
+function parseSseResponse(text) {
+    // SSE format: lines starting with "data: " contain JSON
+    const lines = text.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+            try {
+                return JSON.parse(trimmed.substring(6));
+            } catch (e) {
+                // continue to next line
+            }
+        }
+        // Also try parsing the whole text as JSON (non-SSE response)
+        if (trimmed.startsWith('{')) {
+            try {
+                return JSON.parse(trimmed);
+            } catch (e) {
+                // continue
+            }
+        }
+    }
+    // Last resort: try parsing the whole text as JSON
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
+}
+
+async function mcpExecuteSql(sql, pageToken) {
+    const id = ++mcpRequestId;
+    const args = { sql_query: sql };
+    if (pageToken) args.page_token = pageToken;
+
+    const headers = {
+        'Authorization': `Bearer ${JWT_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+    };
+    if (mcpSessionId) {
+        headers['Mcp-Session-Id'] = mcpSessionId;
+    }
+
+    const res = await fetch(MCP_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            method: 'tools/call',
+            params: {
+                name: 'execute_sql',
+                arguments: args
+            }
+        })
+    });
+
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`MCP SQL HTTP ${res.status}: ${errText.substring(0, 200)}`);
+    }
+
+    // Update session ID if returned
+    const newSessionId = res.headers.get('Mcp-Session-Id');
+    if (newSessionId) mcpSessionId = newSessionId;
+
+    const text = await res.text();
+    const parsed = parseSseResponse(text);
+
+    if (!parsed) throw new Error('Falha ao parsear resposta MCP SSE');
+    if (parsed.error) throw new Error(`MCP erro: ${parsed.error.message || JSON.stringify(parsed.error)}`);
+
+    const result = parsed.result;
+    if (!result) throw new Error('Resposta MCP sem result');
+
+    // Check if there's structuredContent
+    if (result.structuredContent) {
+        return result.structuredContent;
+    }
+
+    // Try parsing from content text
+    if (result.content && result.content.length > 0) {
+        for (const item of result.content) {
+            if (item.type === 'text' && item.text) {
+                try {
+                    return JSON.parse(item.text);
+                } catch (e) {
+                    // not JSON
+                }
+            }
+        }
+    }
+
+    throw new Error('Resposta MCP sem dados estruturados');
+}
+
+async function mcpExecuteSqlAll(sql, label) {
+    let allRows = [];
+    let columns = null;
+    let pageToken = null;
     let pageNum = 0;
+
     while (true) {
         pageNum++;
-        logDebug(`Buscando ${endpoint} pagina ${pageNum} (start=${start})...`);
-        const res = await apiGet(endpoint, { ...params, start, limit });
-        if (res.data) all = all.concat(res.data);
-        if (!res.additional_data || !res.additional_data.pagination || !res.additional_data.pagination.more_items_in_collection) break;
-        start = res.additional_data.pagination.next_start;
+        if (pageNum > 1) logDebug(`${label}: buscando pagina ${pageNum}...`);
+        const result = await mcpExecuteSql(sql, pageToken);
+
+        if (!columns && result.columns) columns = result.columns;
+
+        if (result.data) {
+            allRows = allRows.concat(result.data);
+        }
+
+        if (result.data_truncated && result.next_page_token) {
+            pageToken = result.next_page_token;
+        } else {
+            break;
+        }
     }
-    logDebug(`${endpoint}: ${all.length} registros carregados`, 'ok');
-    return all;
+
+    logDebug(`${label}: ${allRows.length} registros carregados`, 'ok');
+    return { columns: columns || [], data: allRows };
+}
+
+// Helper to convert column-based result to array of objects
+function resultToObjects(result) {
+    const { columns, data } = result;
+    if (!columns || !data) return [];
+    return data.map(row => {
+        const obj = {};
+        columns.forEach((col, i) => {
+            obj[col] = row[i];
+        });
+        return obj;
+    });
 }
 
 // ==================== DATA LOADING ====================
 async function refreshData() {
     debugLogs = [];
-    showLoading('Carregando campos, estagios e usuarios...');
-    logDebug('Iniciando carregamento...');
+    showLoading('Inicializando conexao MCP...');
+    logDebug('Iniciando carregamento via Nekt MCP...');
 
     try {
-        const [fieldsRes, stagesData, usersData, pipelinesData] = await Promise.all([
-            apiGet('/dealFields', { start: 0, limit: 500 }),
-            apiGetAll('/stages'),
-            apiGetAll('/users'),
-            apiGet('/pipelines')
+        // Initialize MCP session
+        await mcpInitialize();
+
+        // Load stages, users, deals, notes, and activities in parallel
+        showLoading('Carregando estagios e usuarios...');
+
+        const [stagesResult, usersResult] = await Promise.all([
+            mcpExecuteSqlAll(
+                `SELECT id, name, pipeline_id FROM nekt_trusted.pipedrive_szs_stages WHERE active_flag = true`,
+                'Stages'
+            ),
+            mcpExecuteSqlAll(
+                `SELECT id, name FROM nekt_trusted.pipedrive_v2_users WHERE active_flag = true`,
+                'Users'
+            )
         ]);
 
-        dealFields = fieldsRes.data || [];
-        logDebug(`${dealFields.length} deal fields carregados`, 'ok');
-
-        // Build pipelines map
-        pipelines = {};
-        (pipelinesData.data || []).forEach(p => { pipelines[p.id] = p.name; });
-        logDebug(`${Object.keys(pipelines).length} pipelines carregados`, 'ok');
-
+        // Build stages map
         stages = {};
-        (stagesData || []).forEach(s => { stages[s.id] = { name: s.name, pipeline_id: s.pipeline_id }; });
+        resultToObjects(stagesResult).forEach(s => {
+            const id = parseInt(s.id, 10);
+            stages[id] = { name: s.name || '', pipeline_id: parseInt(s.pipeline_id, 10) || null };
+        });
+        logDebug(`${Object.keys(stages).length} estagios carregados`, 'ok');
 
+        // Build pipelines map from ALLOWED_PIPELINES constant
+        pipelines = { ...ALLOWED_PIPELINES };
+        logDebug(`${Object.keys(pipelines).length} pipelines configurados`, 'ok');
+
+        // Build users map
         users = {};
-        (usersData || []).forEach(u => { users[u.id] = u.name; });
+        resultToObjects(usersResult).forEach(u => {
+            const id = parseInt(u.id, 10);
+            users[id] = u.name || '';
+        });
+        logDebug(`${Object.keys(users).length} usuarios carregados`, 'ok');
 
-        // Verify known users exist
+        // Verify known users
         logDebug(`User Automacao (${CREATOR_AUTOMACAO_ID}): "${users[CREATOR_AUTOMACAO_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_AUTOMACAO_ID] ? 'ok' : 'err');
         logDebug(`User Morada-Mia (${CREATOR_MORADA_ID}): "${users[CREATOR_MORADA_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_MORADA_ID] ? 'ok' : 'err');
 
-        // Verify field keys
-        for (const [name, key] of Object.entries(FIELD_KEYS)) {
-            const field = dealFields.find(f => f.key === key);
-            logDebug(`Campo ${name}: ${field ? '"' + field.name + '" (' + field.field_type + ')' : 'NAO ENCONTRADO'}`, field ? 'ok' : 'warn');
-        }
+        // Load deals with custom fields + person/org names via JOIN
+        showLoading('Carregando deals abertos...');
+        const dealsResult = await mcpExecuteSqlAll(
+            `SELECT d.id, d.title, d.creator_user_id, d.owner_id, d.pipeline_id, d.stage_id, d.status, d.add_time, d.update_time, d.stage_change_time, d.person_id, d.org_id, d.label_ids,
+  d.custom_fields."3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc" AS link_conversa,
+  d.custom_fields."90db11111ad88f60a3346d04df252660832285ec" AS step_cadencia,
+  d.custom_fields."85b830218feefa6ab8f7186f053a2d84b1b0bd2e" AS data_cadencia,
+  d.custom_fields."5502ecbc173d31de563ecb294e5f04e1394091e6" AS pular_cadencia,
+  d.custom_fields."34336364766f24e1b2fdb25beec9c87856f3ade3" AS respondeu_mia,
+  p.name AS person_name,
+  o.name AS org_name
+FROM nekt_trusted.pipedrive_v2_deals d
+LEFT JOIN nekt_trusted.pipedrive_v2_persons p ON d.person_id = p.id
+LEFT JOIN nekt_trusted.pipedrive_v2_organizations o ON d.org_id = o.id
+WHERE d.status = 'open' AND d.pipeline_id IN (28, 14, 44, 37)`,
+            'Deals'
+        );
+        logDebug(`Total de deals abertos nos funis permitidos: ${dealsResult.data.length}`, dealsResult.data.length > 0 ? 'ok' : 'warn');
 
-        // Load ALL open deals from all pipelines
-        showLoading('Carregando todos os deals abertos...');
-        const rawDeals = await apiGetAll('/deals', { status: 'open' });
-        logDebug(`Total de deals abertos: ${rawDeals.length}`);
-
-        // Filter by allowed pipelines only
-        const allowedPipelineIds = Object.keys(ALLOWED_PIPELINES).map(Number);
-        const filtered = rawDeals.filter(d => allowedPipelineIds.includes(d.pipeline_id));
-        logDebug(`Deals nos funis permitidos: ${filtered.length}`, filtered.length > 0 ? 'ok' : 'warn');
-
-        // Load today's confirmation notes (paginated, stop when past today)
+        // Load today's confirmation notes
         showLoading('Carregando notas de confirmacao...');
-        const today = new Date().toISOString().slice(0, 10);
+        const notesResult = await mcpExecuteSqlAll(
+            `SELECT DISTINCT deal_id FROM nekt_trusted.pipedrive_v2_notes
+WHERE CAST(add_time AS DATE) = CURRENT_DATE
+AND (content LIKE '%Confirmação de Agendamento via automação%' OR content LIKE '%Confirmação de Reagendamento via automação%')`,
+            'Notas confirmacao'
+        );
         confirmacaoDeals = new Set();
-        {
-            let start = 0;
-            const limit = 500;
-            let done = false;
-            while (!done) {
-                const res = await apiGet('/notes', { sort: 'add_time DESC', start, limit });
-                const notes = res.data || [];
-                if (notes.length === 0) break;
-                for (const note of notes) {
-                    if (!note.add_time) continue;
-                    if (note.add_time.slice(0, 10) < today) { done = true; break; }
-                    if (!note.deal_id || !note.content) continue;
-                    const content = note.content.replace(/<[^>]*>/g, '');
-                    if (CONFIRMACAO_NOTE_PATTERNS.some(p => content.includes(p))) {
-                        confirmacaoDeals.add(note.deal_id);
-                    }
-                }
-                if (!res.additional_data?.pagination?.more_items_in_collection) break;
-                start = res.additional_data.pagination.next_start;
-            }
-        }
+        resultToObjects(notesResult).forEach(n => {
+            if (n.deal_id) confirmacaoDeals.add(parseInt(n.deal_id, 10));
+        });
         logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
 
-        // Load cadencia activities (last 4 days using start_date filter)
+        // Load cadencia activities (last 4 days)
         showLoading('Carregando atividades de cadencia...');
-        const fourDaysAgo = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+        const activitiesResult = await mcpExecuteSqlAll(
+            `SELECT deal_id, subject FROM nekt_trusted.pipedrive_v2_activities
+WHERE user_id = 25546644
+AND CAST(add_time AS DATE) >= CURRENT_DATE - INTERVAL '4' DAY
+AND subject LIKE '%Tentativa de contato pela MIA%'`,
+            'Atividades cadencia'
+        );
         cadenciaStepMap = {};
-        {
-            let start = 0;
-            const limit = 500;
-            while (true) {
-                const res = await apiGet('/activities', {
-                    user_id: CREATOR_AUTOMACAO_ID,
-                    start_date: fourDaysAgo,
-                    done: 1,
-                    start, limit
-                });
-                const acts = res.data || [];
-                if (acts.length === 0) break;
-                for (const act of acts) {
-                    if (!act.deal_id || !act.subject) continue;
-                    if (!act.subject.includes('Tentativa de contato pela MIA')) continue;
-                    // Extract attempt number from subject (e.g. "1ª", "2ª", "3ª")
-                    const match = act.subject.match(/^(\d+)ª/);
-                    if (!match) continue;
-                    const attemptNum = parseInt(match[1], 10);
-                    cadenciaStepMap[act.deal_id] = Math.max(cadenciaStepMap[act.deal_id] || 0, attemptNum);
-                }
-                if (!res.additional_data?.pagination?.more_items_in_collection) break;
-                start = res.additional_data.pagination.next_start;
-            }
-        }
+        resultToObjects(activitiesResult).forEach(act => {
+            if (!act.deal_id || !act.subject) return;
+            const match = act.subject.match(/^(\d+)/);
+            if (!match) return;
+            const attemptNum = parseInt(match[1], 10);
+            const dealId = parseInt(act.deal_id, 10);
+            cadenciaStepMap[dealId] = Math.max(cadenciaStepMap[dealId] || 0, attemptNum);
+        });
         logDebug(`Cadencia calculada (ultimos 4 dias): ${Object.keys(cadenciaStepMap).length} deals com atividades`, 'ok');
 
-        allDeals = filtered.map(normalizeDeal);
+        // Normalize deals
+        const rawDeals = resultToObjects(dealsResult);
+        allDeals = rawDeals.map(normalizeDeal);
 
         const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
         const countMorada = allDeals.filter(d => d.isMorada).length;
         const countOutros = allDeals.filter(d => !d.isAutomacao && !d.isMorada).length;
         logDebug(`Proprietarios - Automacao: ${countAutomacao}, Morada-Mia: ${countMorada}, Outros: ${countOutros}`, 'ok');
 
-        // Log some sample data
+        // Log sample
         if (allDeals.length > 0) {
             const sample = allDeals[0];
             logDebug(`Amostra - titulo: "${sample.title}", proprietario: "${sample.owner}", pipeline: "${sample.pipeline}", stage: "${sample.stage}", link: "${sample.link || 'VAZIO'}", step: ${sample.stepCadencia}`);
         }
 
-        // Render pipeline filter buttons dynamically
         renderPipelineButtons();
-
         applyFilters();
         updateStats();
         hideLoading();
@@ -789,78 +920,74 @@ async function refreshData() {
         hideLoading();
         showError('Erro ao carregar dados: ' + e.message);
         logDebug('ERRO: ' + e.message, 'err');
+        console.error(e);
     }
 
     renderDebug();
 }
 
 function normalizeDeal(d) {
-    const ownerId = d.user_id ? (d.user_id.id || d.user_id) : null;
-    const ownerName = d.user_id ? (d.user_id.name || users[ownerId] || '') : '';
-    const personName = d.person_id ? (d.person_id.name || '') : '';
-    const orgName = d.org_id ? (d.org_id.name || '') : '';
-    const stageInfo = d.stage_id ? (stages[d.stage_id] || { name: `Stage ${d.stage_id}`, pipeline_id: null }) : { name: '', pipeline_id: null };
-    const stageName = typeof stageInfo === 'string' ? stageInfo : stageInfo.name;
-    const pipelineId = d.pipeline_id || (typeof stageInfo === 'object' ? stageInfo.pipeline_id : null);
+    const ownerId = d.owner_id ? parseInt(d.owner_id, 10) : null;
+    const ownerName = ownerId ? (users[ownerId] || '') : '';
+    const personName = d.person_name || '';
+    const orgName = d.org_name || '';
+    const stageId = d.stage_id ? parseInt(d.stage_id, 10) : null;
+    const stageInfo = stageId ? (stages[stageId] || { name: `Stage ${stageId}`, pipeline_id: null }) : { name: '', pipeline_id: null };
+    const stageName = stageInfo.name;
+    const pipelineId = d.pipeline_id ? parseInt(d.pipeline_id, 10) : (stageInfo.pipeline_id || null);
     const pipelineName = pipelineId ? (pipelines[pipelineId] || `Pipeline ${pipelineId}`) : '';
 
-    const linkValue = (d[FIELD_KEYS.linkConversa] || '').toString().trim();
-    // Use max attempt number from activities (last 4 days) to determine cadencia step
-    // 1ª Tentativa = cadencia 1, 2ª Tentativa = cadencia 2
-    const maxAttempt = cadenciaStepMap[d.id] || 0;
-    const stepCadencia = maxAttempt >= 2 ? 2 : maxAttempt >= 1 ? 1 : (parseFloat(d[FIELD_KEYS.stepCadencia]) || 0);
-    const dataCadencia = d[FIELD_KEYS.dataCadencia] || '';
-    const pularCadencia = d[FIELD_KEYS.pularCadencia] || '';
-    const respondeuMia = d[FIELD_KEYS.respondeuMia] || '';
+    const linkValue = (d.link_conversa || '').toString().trim();
+    const dealId = parseInt(d.id, 10);
 
-    // Resolve pularCadencia option label
-    const pularLabel = resolveFieldLabel(FIELD_KEYS.pularCadencia, pularCadencia);
+    // Use max attempt number from activities (last 4 days) to determine cadencia step
+    const maxAttempt = cadenciaStepMap[dealId] || 0;
+    const rawStep = parseFloat(d.step_cadencia) || 0;
+    const stepCadencia = maxAttempt >= 2 ? 2 : maxAttempt >= 1 ? 1 : rawStep;
+    const dataCadencia = d.data_cadencia || '';
+    const pularCadencia = d.pular_cadencia || '';
+    const respondeuMia = d.respondeu_mia || '';
 
     const isAutomacao = ownerId === CREATOR_AUTOMACAO_ID;
     const isMorada = ownerId === CREATOR_MORADA_ID;
-    const creatorId = d.creator_user_id ? (d.creator_user_id.id || d.creator_user_id) : null;
+    const creatorId = d.creator_user_id ? parseInt(d.creator_user_id, 10) : null;
     const createdByApi = creatorId === CREATOR_AUTOMACAO_ID || creatorId === CREATOR_MORADA_ID;
 
-    // Confirmation check (based on notes loaded in refreshData)
-    const hasConfirmacao = confirmacaoDeals.has(d.id);
+    const hasConfirmacao = confirmacaoDeals.has(dealId);
+
+    // Parse stage_change_time for hours-in-stage calculation
+    let hoursInStage = 0;
+    if (d.stage_change_time) {
+        const sct = new Date(d.stage_change_time);
+        if (!isNaN(sct.getTime())) {
+            hoursInStage = (Date.now() - sct.getTime()) / 3600000;
+        }
+    }
 
     return {
-        id: d.id,
+        id: dealId,
         title: d.title || '',
         person: personName,
         org: orgName,
         pipeline: pipelineName,
         pipelineId,
         stage: stageName,
-        stageId: d.stage_id,
+        stageId,
         owner: ownerName,
         ownerId,
         createdByApi,
         link: linkValue,
         stepCadencia,
         dataCadencia,
-        pularCadencia: pularLabel,
+        pularCadencia: String(pularCadencia || ''),
         respondeuMia,
         add_time: d.add_time || '',
         stage_change_time: d.stage_change_time || '',
-        hoursInStage: d.stage_change_time ? ((Date.now() - new Date(d.stage_change_time + ' UTC').getTime()) / 3600000) : 0,
+        hoursInStage,
         hasConfirmacao,
         isAutomacao,
         isMorada,
-        raw: d
     };
-}
-
-function resolveFieldLabel(fieldKey, value) {
-    if (!fieldKey || !value) return String(value || '');
-    const field = dealFields.find(f => f.key === fieldKey);
-    if (!field || !field.options) return String(value || '');
-    const ids = String(value).split(',');
-    const labels = ids.map(id => {
-        const opt = field.options.find(o => String(o.id) === id.trim());
-        return opt ? opt.label : id.trim();
-    });
-    return labels.join(', ');
 }
 
 // ==================== FILTERS ====================
@@ -890,7 +1017,6 @@ function setFilterFromCard(filter) {
 }
 
 function renderPipelineButtons() {
-    // Find which pipelines have deals
     const pipelineIds = [...new Set(allDeals.map(d => d.pipelineId).filter(Boolean))];
     const container = document.getElementById('pipelineFilters');
     container.innerHTML = pipelineIds.map(pid => {
@@ -933,8 +1059,7 @@ function onSearch(val) {
     applyFilters();
 }
 
-// Shared filter functions — used by both stats and table
-// no-link: todos os proprietarios; demais: apenas Automacao/Morada-Mia
+// Shared filter functions
 const FILTERS = {
     'no-link': d => d.createdByApi && !d.link,
     'confirmacao': d => d.hasConfirmacao,
@@ -945,16 +1070,13 @@ const FILTERS = {
     'transferidos': d => d.createdByApi && d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada,
 };
 
-// Filters that show ALL owners (not restricted to Automacao/Morada)
 const ALL_OWNERS_FILTERS = new Set(['all', 'no-link', 'confirmacao', 'transferidos']);
 
 function getBaseDeals(forFilter) {
     let base = [...allDeals];
-    // Pipeline filter
     if (currentPipeline !== 'all') {
         base = base.filter(d => d.pipelineId === currentPipeline);
     }
-    // Date filter
     const dateFrom = document.getElementById('dateFrom').value;
     const dateTo = document.getElementById('dateTo').value;
     if (dateFrom) {
@@ -963,7 +1085,6 @@ function getBaseDeals(forFilter) {
     if (dateTo) {
         base = base.filter(d => d.add_time <= dateTo + 'T23:59:59');
     }
-    // Owner filter: unless it's a filter that shows all owners
     if (!ALL_OWNERS_FILTERS.has(forFilter)) {
         base = base.filter(d => d.isAutomacao || d.isMorada);
     }
@@ -973,7 +1094,6 @@ function getBaseDeals(forFilter) {
 function applyFilters() {
     let result = getBaseDeals(currentFilter);
 
-    // Category filter
     if (currentFilter !== 'all' && FILTERS[currentFilter]) {
         result = result.filter(FILTERS[currentFilter]);
     }
@@ -1045,7 +1165,7 @@ function renderTable() {
             ? `<span class="badge badge-purple">Step ${d.stepCadencia}</span>`
             : '<span class="badge badge-gray">-</span>';
 
-        const pularBadge = d.pularCadencia && d.pularCadencia !== '-'
+        const pularBadge = d.pularCadencia && d.pularCadencia !== '-' && d.pularCadencia !== ''
             ? `<span class="badge badge-red">${escapeHtml(d.pularCadencia)}</span>`
             : '<span class="badge badge-gray">-</span>';
 
@@ -1094,8 +1214,8 @@ function goPage(p) {
 
 // ==================== STATS ====================
 function updateStats() {
-    const baseOwner = getBaseDeals('stuck'); // filtered by Automacao/Morada
-    const baseNoLink = getBaseDeals('no-link'); // all owners (createdByApi check is in FILTERS)
+    const baseOwner = getBaseDeals('stuck');
+    const baseNoLink = getBaseDeals('no-link');
 
     document.getElementById('statTotal').textContent = baseOwner.length;
     document.getElementById('statNoLink').textContent = baseNoLink.filter(FILTERS['no-link']).length;
@@ -1113,41 +1233,38 @@ function openConfig() {
     const modal = document.getElementById('configModal');
     modal.classList.add('active');
 
-    const customFields = dealFields.filter(f => f.key && f.key.length > 10);
-    const selects = [
-        { id: 'cfgLinkConversa', current: FIELD_KEYS.linkConversa },
-        { id: 'cfgStepCadencia', current: FIELD_KEYS.stepCadencia },
-        { id: 'cfgDataCadencia', current: FIELD_KEYS.dataCadencia },
-        { id: 'cfgPularCadencia', current: FIELD_KEYS.pularCadencia },
-        { id: 'cfgRespondeuMia', current: FIELD_KEYS.respondeuMia },
+    // Since we use SQL directly, the config modal shows info about the current field mappings
+    const fieldMappings = [
+        { name: 'Link da Conversa', hash: '3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc' },
+        { name: 'Step Cadencia', hash: '90db11111ad88f60a3346d04df252660832285ec' },
+        { name: 'Data Ultima Cadencia', hash: '85b830218feefa6ab8f7186f053a2d84b1b0bd2e' },
+        { name: 'Pular Cadencia', hash: '5502ecbc173d31de563ecb294e5f04e1394091e6' },
+        { name: 'Respondeu MIA', hash: '34336364766f24e1b2fdb25beec9c87856f3ade3' },
     ];
 
-    selects.forEach(({ id, current }) => {
+    // Populate selects with current values (read-only info)
+    const selects = [
+        { id: 'cfgLinkConversa', mapping: fieldMappings[0] },
+        { id: 'cfgStepCadencia', mapping: fieldMappings[1] },
+        { id: 'cfgDataCadencia', mapping: fieldMappings[2] },
+        { id: 'cfgPularCadencia', mapping: fieldMappings[3] },
+        { id: 'cfgRespondeuMia', mapping: fieldMappings[4] },
+    ];
+
+    selects.forEach(({ id, mapping }) => {
         const sel = document.getElementById(id);
-        sel.innerHTML = '<option value="">-- Nenhum --</option>';
-        customFields.forEach(f => {
-            const opt = document.createElement('option');
-            opt.value = f.key;
-            opt.textContent = `${f.name} (${f.field_type})`;
-            if (current === f.key) opt.selected = true;
-            sel.appendChild(opt);
-        });
+        sel.innerHTML = `<option value="${mapping.hash}" selected>${mapping.name} (${mapping.hash.substring(0, 12)}...)</option>`;
     });
 
     const list = document.getElementById('fieldsList');
-    list.innerHTML = dealFields.map(f =>
-        `<div class="field-item"><span class="key">${escapeHtml(f.key)}</span><span class="name">${escapeHtml(f.name)} (${f.field_type})</span></div>`
+    list.innerHTML = fieldMappings.map(f =>
+        `<div class="field-item"><span class="key">${escapeHtml(f.hash)}</span><span class="name">${escapeHtml(f.name)}</span></div>`
     ).join('');
 }
 
 function closeConfig() { document.getElementById('configModal').classList.remove('active'); }
 
 async function saveConfig() {
-    FIELD_KEYS.linkConversa = document.getElementById('cfgLinkConversa').value;
-    FIELD_KEYS.stepCadencia = document.getElementById('cfgStepCadencia').value;
-    FIELD_KEYS.dataCadencia = document.getElementById('cfgDataCadencia').value;
-    FIELD_KEYS.pularCadencia = document.getElementById('cfgPularCadencia').value;
-    FIELD_KEYS.respondeuMia = document.getElementById('cfgRespondeuMia').value;
     closeConfig();
     await refreshData();
 }
@@ -1232,7 +1349,6 @@ function scheduleAt8AM() {
     const ms = next8 - now;
     setTimeout(() => {
         refreshData();
-        // After firing, schedule for next day
         setInterval(() => { refreshData(); }, 24 * 60 * 60 * 1000);
     }, ms);
     const h = Math.floor(ms / 3600000);
