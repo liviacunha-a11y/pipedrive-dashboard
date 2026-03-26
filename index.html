@@ -547,7 +547,7 @@ function getDealsForTab(tab, pipelineFilter) {
     if (pipelineFilter !== 'all') {
         base = base.filter(function(d) { return d.pipelineId === pipelineFilter; });
     }
-    var isTransferido = function(d) { return d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada; };
+    var isTransferido = function(d) { return d.stepCadencia >= 3 && !d.isAutomacao && !d.isMorada; };
     var today = new Date().toISOString().slice(0, 10);
     var yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
