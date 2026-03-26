@@ -291,11 +291,26 @@
         <div class="kpi-breakdown" id="breakdownStep2"></div>
     </div>
     <div class="kpi-card green" id="cardTransferidos" onclick="selectTab('transferidos')">
-        <div class="kpi-label">Transferidos para SDRs</div>
+        <div class="kpi-label">Transferidos - Total</div>
         <div class="kpi-value" id="kpiTransferidos">-</div>
-        <div class="kpi-sub">Cadencia finalizada, novo proprietario</div>
+        <div class="kpi-sub">Todos os transferidos para SDRs</div>
         <div class="kpi-breakdown" id="breakdownTransferidos"></div>
     </div>
+</div>
+<div class="kpi-row" style="padding-top:0;">
+    <div class="kpi-card green" id="cardTransHoje" onclick="selectTab('trans-hoje')" style="border-left:3px solid #22c55e;">
+        <div class="kpi-label">Transferidos Hoje</div>
+        <div class="kpi-value" id="kpiTransHoje">-</div>
+        <div class="kpi-sub" id="subTransHoje">-</div>
+        <div class="kpi-breakdown" id="breakdownTransHoje"></div>
+    </div>
+    <div class="kpi-card green" id="cardTransOntem" onclick="selectTab('trans-ontem')" style="border-left:3px solid #3b82f6;">
+        <div class="kpi-label">Transferidos Ontem</div>
+        <div class="kpi-value" id="kpiTransOntem">-</div>
+        <div class="kpi-sub" id="subTransOntem">-</div>
+        <div class="kpi-breakdown" id="breakdownTransOntem"></div>
+    </div>
+    <div style="grid-column: span 2;"></div>
 </div>
 
 <!-- Filters -->
@@ -512,6 +527,7 @@ async function refreshData() {
                 stepCadencia: step,
                 dataCadencia: d[CF_DATA_CADENCIA] || '',
                 add_time: d.add_time || '',
+                update_time: d.update_time || '',
             });
         });
 
@@ -531,6 +547,10 @@ function getDealsForTab(tab, pipelineFilter) {
     if (pipelineFilter !== 'all') {
         base = base.filter(function(d) { return d.pipelineId === pipelineFilter; });
     }
+    var isTransferido = function(d) { return d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada; };
+    var today = new Date().toISOString().slice(0, 10);
+    var yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
     switch (tab) {
         case 'no-link':
             return base.filter(function(d) { return !d.link; });
@@ -539,7 +559,11 @@ function getDealsForTab(tab, pipelineFilter) {
         case 'step2':
             return base.filter(function(d) { return (d.isAutomacao || d.isMorada) && d.stepCadencia === 2; });
         case 'transferidos':
-            return base.filter(function(d) { return d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada; });
+            return base.filter(isTransferido);
+        case 'trans-hoje':
+            return base.filter(function(d) { return isTransferido(d) && d.update_time.slice(0, 10) === today; });
+        case 'trans-ontem':
+            return base.filter(function(d) { return isTransferido(d) && d.update_time.slice(0, 10) === yesterday; });
         default:
             return base;
     }
@@ -561,9 +585,9 @@ function updateAll() {
 }
 
 function updateKPIs() {
-    var tabs = ['no-link', 'step1', 'step2', 'transferidos'];
-    var ids = ['kpiNoLink', 'kpiStep1', 'kpiStep2', 'kpiTransferidos'];
-    var breakdownIds = ['breakdownNoLink', 'breakdownStep1', 'breakdownStep2', 'breakdownTransferidos'];
+    var tabs = ['no-link', 'step1', 'step2', 'transferidos', 'trans-hoje', 'trans-ontem'];
+    var ids = ['kpiNoLink', 'kpiStep1', 'kpiStep2', 'kpiTransferidos', 'kpiTransHoje', 'kpiTransOntem'];
+    var breakdownIds = ['breakdownNoLink', 'breakdownStep1', 'breakdownStep2', 'breakdownTransferidos', 'breakdownTransHoje', 'breakdownTransOntem'];
 
     tabs.forEach(function(tab, i) {
         var count = getDealsForTab(tab, 'all').length;
@@ -577,9 +601,15 @@ function updateKPIs() {
         document.getElementById(breakdownIds[i]).innerHTML = html;
     });
 
+    // Date labels
+    var today = new Date();
+    var yesterday = new Date(Date.now() - 86400000);
+    document.getElementById('subTransHoje').textContent = today.toLocaleDateString('pt-BR');
+    document.getElementById('subTransOntem').textContent = yesterday.toLocaleDateString('pt-BR');
+
     // Active card highlight
     document.querySelectorAll('.kpi-card').forEach(function(c) { c.classList.remove('active'); });
-    var cardMap = { 'no-link': 'cardNoLink', 'step1': 'cardStep1', 'step2': 'cardStep2', 'transferidos': 'cardTransferidos' };
+    var cardMap = { 'no-link': 'cardNoLink', 'step1': 'cardStep1', 'step2': 'cardStep2', 'transferidos': 'cardTransferidos', 'trans-hoje': 'cardTransHoje', 'trans-ontem': 'cardTransOntem' };
     if (cardMap[currentTab]) document.getElementById(cardMap[currentTab]).classList.add('active');
 }
 
@@ -626,7 +656,7 @@ function applyFilters() {
         return 0;
     });
 
-    var titles = { 'no-link': 'Sem Link de Conversa', 'step1': 'Cadencia Step 1 - 1a Tentativa MIA', 'step2': 'Cadencia Step 2 - 2a Tentativa MIA', 'transferidos': 'Transferidos para SDRs' };
+    var titles = { 'no-link': 'Sem Link de Conversa', 'step1': 'Cadencia Step 1 - 1a Tentativa MIA', 'step2': 'Cadencia Step 2 - 2a Tentativa MIA', 'transferidos': 'Transferidos para SDRs - Total', 'trans-hoje': 'Transferidos para SDRs - Hoje', 'trans-ontem': 'Transferidos para SDRs - Ontem' };
     document.getElementById('sectionTitle').textContent = titles[currentTab] || '';
     document.getElementById('sectionCount').textContent = deals.length + ' deal(s)';
 
