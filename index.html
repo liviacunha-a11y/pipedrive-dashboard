@@ -430,13 +430,12 @@ async function refreshData() {
         users = {};
         (usersData || []).forEach(function(u) { users[u.id] = u.name; });
 
-        // Deals from all pipelines
+        // Deals - single call, filter by pipeline in JS
         showLoading('Carregando deals abertos...');
-        var dealProms = PIPELINE_IDS.map(function(pid) {
-            return apiFetchAll('/deals', { pipeline_id: pid, status: 'open' });
-        });
-        var dealArrays = await Promise.all(dealProms);
-        var rawDeals = [].concat.apply([], dealArrays);
+        var rawDealsAll = await apiFetchAll('/deals', { status: 'open' });
+        var allowedSet = {};
+        PIPELINE_IDS.forEach(function(pid) { allowedSet[pid] = true; });
+        var rawDeals = rawDealsAll.filter(function(d) { return allowedSet[d.pipeline_id]; });
 
         // Activities for cadencia (last 4 days)
         showLoading('Carregando atividades de cadencia...');
