@@ -462,12 +462,20 @@ async function refreshData() {
         // Filter: only deals created by Automacao or Morada
         allDeals = [];
         rawDeals.forEach(function(d) {
-            var creatorId = (typeof d.creator_user_id === 'object' && d.creator_user_id)
-                ? d.creator_user_id.id : d.creator_user_id;
-            if (creatorId !== AUTOMACAO_ID && creatorId !== MORADA_ID) return;
+            var rawCreator = d.creator_user_id;
+            var creatorId = (typeof rawCreator === 'object' && rawCreator)
+                ? (rawCreator.id || rawCreator.value || rawCreator) : rawCreator;
+            creatorId = Number(creatorId);
 
-            var ownerId = (typeof d.user_id === 'object' && d.user_id) ? d.user_id.id : d.user_id;
-            var ownerName = (typeof d.user_id === 'object' && d.user_id) ? d.user_id.name : (users[ownerId] || '');
+            var rawOwner = d.user_id;
+            var ownerId = (typeof rawOwner === 'object' && rawOwner)
+                ? (rawOwner.id || rawOwner.value || rawOwner) : rawOwner;
+            ownerId = Number(ownerId);
+
+            // Incluir apenas se criado por Automacao ou Morada
+            var criadoPorAPI = (creatorId === AUTOMACAO_ID || creatorId === MORADA_ID);
+            if (!criadoPorAPI) return;
+            var ownerName = (typeof rawOwner === 'object' && rawOwner) ? (rawOwner.name || '') : (users[ownerId] || '');
             var personName = (typeof d.person_id === 'object' && d.person_id) ? d.person_id.name : '';
             var orgName = (typeof d.org_id === 'object' && d.org_id) ? d.org_id.name : '';
             var si = stages[d.stage_id] || { name: 'Stage ' + d.stage_id, pipeline_id: d.pipeline_id };
