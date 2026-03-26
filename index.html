@@ -714,11 +714,23 @@ function showError(m) { var e = document.getElementById('errorBanner'); e.textCo
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function trunc(s, n) { return s.length > n ? s.slice(0, n) + '...' : s; }
 
-// ==================== AUTO REFRESH ====================
-setInterval(refreshData, 60 * 60 * 1000);
+// ==================== AUTO REFRESH (1x por dia as 8h) ====================
+function scheduleAt8AM() {
+    var now = new Date();
+    var next8 = new Date(now);
+    next8.setHours(8, 0, 0, 0);
+    if (now >= next8) next8.setDate(next8.getDate() + 1);
+    var ms = next8 - now;
+    setTimeout(function() {
+        refreshData();
+        // Repetir a cada 24h
+        setInterval(refreshData, 24 * 60 * 60 * 1000);
+    }, ms);
+}
 
 // ==================== INIT ====================
 refreshData();
+scheduleAt8AM();
 </script>
 </body>
 </html>
