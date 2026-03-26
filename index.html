@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Pipedrive - Deals</title>
+    <title>Dashboard MIA - Seazone</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #0f1117;
@@ -14,8 +13,7 @@
             min-height: 100vh;
         }
 
-        .dashboard { display: block; }
-
+        /* Top Bar */
         .topbar {
             background: #1c1f2b;
             border-bottom: 1px solid #2d3348;
@@ -24,146 +22,123 @@
             align-items: center;
             justify-content: space-between;
         }
-
         .topbar h1 { font-size: 18px; color: #fff; }
-
-        .topbar-actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .btn-icon {
+        .topbar-actions { display: flex; gap: 10px; align-items: center; }
+        .topbar .sub { font-size: 12px; color: #8b8fa3; margin-top: 2px; }
+        .btn {
             background: #2d3348;
             border: none;
             color: #8b8fa3;
-            padding: 8px 12px;
+            padding: 8px 14px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
             transition: all 0.2s;
         }
+        .btn:hover { background: #3d4460; color: #fff; }
 
-        .btn-icon:hover { background: #3d4460; color: #fff; }
-
-        /* Stats Cards */
-        .stats-row {
+        /* KPI Cards */
+        .kpi-row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
             padding: 24px;
         }
-
-        .stat-card {
+        .kpi-card {
             background: #1c1f2b;
             border: 1px solid #2d3348;
             border-radius: 10px;
             padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
             position: relative;
             overflow: hidden;
-            cursor: pointer;
-            transition: border-color 0.2s;
         }
-
-        .stat-card:hover { border-color: #4f8ff7; }
-
-        .stat-card::before {
+        .kpi-card:hover { border-color: #4f8ff7; transform: translateY(-2px); }
+        .kpi-card.active { border-color: #4f8ff7; box-shadow: 0 0 0 1px #4f8ff7; }
+        .kpi-card::before {
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0;
             height: 3px;
         }
+        .kpi-card.orange::before { background: #f7954f; }
+        .kpi-card.purple::before { background: #a855f7; }
+        .kpi-card.blue::before { background: #4f8ff7; }
+        .kpi-card.green::before { background: #22c55e; }
+        .kpi-label { font-size: 11px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .kpi-value { font-size: 36px; font-weight: 700; color: #fff; }
+        .kpi-sub { font-size: 12px; color: #6b7080; margin-top: 6px; }
 
-        .stat-card.blue::before { background: #4f8ff7; }
-        .stat-card.orange::before { background: #f7954f; }
-        .stat-card.red::before { background: #f74f4f; }
-        .stat-card.purple::before { background: #a855f7; }
-        .stat-card.green::before { background: #22c55e; }
-
-        .stat-card .label {
-            font-size: 12px;
-            color: #8b8fa3;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .stat-card .value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #fff;
-        }
-
-        .stat-card .sub {
-            font-size: 12px;
-            color: #8b8fa3;
-            margin-top: 4px;
-        }
-
-        /* Filters */
-        .filters-bar {
-            padding: 0 24px 16px;
+        /* Pipeline breakdown under KPI */
+        .kpi-breakdown {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            margin-top: 10px;
             flex-wrap: wrap;
-            align-items: center;
         }
-
-        .filter-btn {
-            padding: 8px 16px;
-            background: #1c1f2b;
-            border: 1px solid #2d3348;
+        .kpi-tag {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
             color: #8b8fa3;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.2s;
         }
 
-        .date-input {
-            padding: 6px 12px;
-            background: #1c1f2b;
-            border: 1px solid #2d3348;
-            border-radius: 8px;
-            color: #e1e4e8;
-            font-size: 13px;
-            color-scheme: dark;
+        /* Section */
+        .section {
+            padding: 0 24px 24px;
         }
-
-        .date-input:focus { outline: none; border-color: #4f8ff7; }
-
-        .filter-btn:hover { border-color: #4f8ff7; color: #4f8ff7; }
-        .filter-btn.active {
-            background: #4f8ff7;
-            border-color: #4f8ff7;
-            color: #fff;
-        }
-
-        /* Table */
-        .table-container { padding: 0 24px 24px; }
-
-        .table-header {
+        .section-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
         }
+        .section-header h2 { font-size: 16px; color: #fff; }
+        .section-header .count {
+            font-size: 13px;
+            color: #8b8fa3;
+            background: #2d3348;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
 
-        .table-header h2 { font-size: 16px; color: #fff; }
-        .table-header .count { font-size: 13px; color: #8b8fa3; }
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 8px;
+            padding: 0 24px 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-label { font-size: 12px; color: #8b8fa3; margin-right: 4px; }
+        .filter-chip {
+            padding: 6px 14px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            color: #8b8fa3;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .filter-chip:hover { border-color: #4f8ff7; color: #4f8ff7; }
+        .filter-chip.active { background: #4f8ff7; border-color: #4f8ff7; color: #fff; }
 
-        .search-input {
-            padding: 8px 14px;
+        .search-box {
+            padding: 7px 14px;
             background: #1c1f2b;
             border: 1px solid #2d3348;
             border-radius: 8px;
             color: #e1e4e8;
             font-size: 13px;
-            width: 280px;
+            width: 260px;
+            margin-left: auto;
         }
+        .search-box:focus { outline: none; border-color: #4f8ff7; }
 
-        .search-input:focus { outline: none; border-color: #4f8ff7; }
-
+        /* Table */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -172,11 +147,10 @@
             overflow: hidden;
             border: 1px solid #2d3348;
         }
-
         thead th {
-            padding: 12px 16px;
+            padding: 10px 14px;
             text-align: left;
-            font-size: 12px;
+            font-size: 11px;
             color: #8b8fa3;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -186,22 +160,15 @@
             user-select: none;
             white-space: nowrap;
         }
-
         thead th:hover { color: #4f8ff7; }
-
-        tbody tr {
-            border-bottom: 1px solid #2d3348;
-            transition: background 0.15s;
-        }
-
+        tbody tr { border-bottom: 1px solid #2d3348; transition: background 0.15s; }
         tbody tr:hover { background: #22253a; }
         tbody tr:last-child { border-bottom: none; }
-
         tbody td {
-            padding: 12px 16px;
+            padding: 10px 14px;
             font-size: 13px;
             color: #c9cdd5;
-            max-width: 220px;
+            max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -214,324 +181,160 @@
             font-size: 11px;
             font-weight: 600;
         }
-
-        .badge-blue { background: rgba(79,143,247,0.15); color: #4f8ff7; }
         .badge-orange { background: rgba(247,149,79,0.15); color: #f7954f; }
-        .badge-red { background: rgba(247,79,79,0.15); color: #f74f4f; }
+        .badge-blue { background: rgba(79,143,247,0.15); color: #4f8ff7; }
         .badge-purple { background: rgba(168,85,247,0.15); color: #a855f7; }
         .badge-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-red { background: rgba(247,79,79,0.15); color: #f74f4f; }
         .badge-gray { background: rgba(139,143,163,0.15); color: #8b8fa3; }
 
-        .link-empty { color: #f74f4f; font-style: italic; }
-        .link-ok a { color: #4f8ff7; text-decoration: none; }
-        .link-ok a:hover { text-decoration: underline; }
+        .link-deal { color: #4f8ff7; text-decoration: none; }
+        .link-deal:hover { text-decoration: underline; }
+        .text-empty { color: #f74f4f; font-style: italic; font-size: 12px; }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: center; gap: 6px; padding: 16px 24px; }
+        .pagination button {
+            padding: 5px 11px;
+            background: #1c1f2b;
+            border: 1px solid #2d3348;
+            color: #8b8fa3;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .pagination button:hover { border-color: #4f8ff7; color: #4f8ff7; }
+        .pagination button.active { background: #4f8ff7; border-color: #4f8ff7; color: #fff; }
+        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .empty-state { text-align: center; padding: 50px 20px; color: #6b7080; font-size: 14px; }
 
         /* Loading */
         .loading-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(15,17,23,0.85);
+            background: rgba(15,17,23,0.9);
             z-index: 100;
             align-items: center;
             justify-content: center;
             flex-direction: column;
             gap: 16px;
         }
-
         .loading-overlay.active { display: flex; }
-
         .spinner {
-            width: 40px; height: 40px;
+            width: 36px; height: 36px;
             border: 3px solid #2d3348;
             border-top-color: #4f8ff7;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { color: #8b8fa3; font-size: 14px; }
 
-        /* Error */
-        .error-msg {
+        .error-banner {
             background: rgba(247,79,79,0.1);
             border: 1px solid rgba(247,79,79,0.3);
             color: #f74f4f;
-            padding: 12px 16px;
+            padding: 10px 16px;
             border-radius: 8px;
             font-size: 13px;
             margin: 0 24px 16px;
             display: none;
         }
 
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            padding: 16px 24px;
+        /* Owner column highlight */
+        .owner-sdr { color: #22c55e; font-weight: 600; }
+
+        @media (max-width: 900px) {
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .search-box { width: 100%; margin-left: 0; margin-top: 8px; }
+            .section { overflow-x: auto; }
         }
-
-        .pagination button {
-            padding: 6px 12px;
-            background: #1c1f2b;
-            border: 1px solid #2d3348;
-            color: #8b8fa3;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .pagination button:hover { border-color: #4f8ff7; color: #4f8ff7; }
-        .pagination button.active { background: #4f8ff7; border-color: #4f8ff7; color: #fff; }
-        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #8b8fa3;
-        }
-
-        /* Debug panel */
-        .debug-panel {
-            background: #1c1f2b;
-            border: 1px solid #2d3348;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 0 24px 16px;
-            font-size: 12px;
-            font-family: monospace;
-            color: #8b8fa3;
-            display: none;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .debug-panel.active { display: block; }
-        .debug-panel .ok { color: #22c55e; }
-        .debug-panel .warn { color: #f7954f; }
-        .debug-panel .err { color: #f74f4f; }
-
-        /* Config Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(15,17,23,0.85);
-            z-index: 200;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.active { display: flex; }
-
-        .modal {
-            background: #1c1f2b;
-            border: 1px solid #2d3348;
-            border-radius: 12px;
-            padding: 32px;
-            width: 100%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal h2 { margin-bottom: 16px; font-size: 18px; color: #fff; }
-
-        .modal label {
-            display: block;
-            font-size: 13px;
-            color: #8b8fa3;
-            margin-bottom: 4px;
-            margin-top: 12px;
-        }
-
-        .modal select, .modal input[type="text"] {
-            width: 100%;
-            padding: 8px 12px;
-            background: #0f1117;
-            border: 1px solid #2d3348;
-            border-radius: 6px;
-            color: #e1e4e8;
-            font-size: 13px;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 24px;
-            justify-content: flex-end;
-        }
-
-        .btn-secondary {
-            padding: 8px 16px;
-            background: #2d3348;
-            border: none;
-            color: #e1e4e8;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .btn-save {
-            padding: 8px 16px;
-            background: #4f8ff7;
-            border: none;
-            color: #fff;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .field-item {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            padding: 6px 0;
-            border-bottom: 1px solid #2d3348;
-            font-size: 12px;
-        }
-
-        .field-item .key { color: #4f8ff7; font-family: monospace; min-width: 160px; }
-        .field-item .name { color: #c9cdd5; }
-
-        .scroll-list {
-            max-height: 250px;
-            overflow-y: auto;
-            border: 1px solid #2d3348;
-            border-radius: 6px;
-            padding: 8px;
-            margin-top: 8px;
-            background: #0f1117;
-        }
-
-        @media (max-width: 768px) {
-            .stats-row { grid-template-columns: repeat(2, 1fr); }
-            .search-input { width: 100%; }
-            .filters-bar { padding: 0 16px 16px; }
-            .table-container { padding: 0 16px 16px; overflow-x: auto; }
+        @media (max-width: 500px) {
+            .kpi-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-<div class="dashboard" id="dashboard">
-    <div class="topbar">
-        <h1>Dashboard Pipedrive - Seazone</h1>
-        <div class="topbar-actions">
-            <button class="btn-icon" onclick="toggleDebug()">&#128270; Debug</button>
-            <button class="btn-icon" onclick="openConfig()" title="Configurar campos">&#9881; Campos</button>
-            <button class="btn-icon" onclick="refreshData()">&#8635; Atualizar</button>
-            <button class="btn-icon" onclick="exportCSV()">&#8681; CSV</button>
-        </div>
+<div class="topbar">
+    <div>
+        <h1>Dashboard MIA - Controle de Deals</h1>
+        <div class="sub" id="lastUpdated">Carregando...</div>
     </div>
-
-    <!-- Stats -->
-    <div class="stats-row">
-        <div class="stat-card blue" onclick="setFilterFromCard('all')">
-            <div class="label">Total Deals Carregados</div>
-            <div class="value" id="statTotal">-</div>
-            <div class="sub">Todos os funis (ou funil selecionado)</div>
-        </div>
-        <div class="stat-card orange" onclick="setFilterFromCard('no-link')">
-            <div class="label">Link de Conversa Vazio</div>
-            <div class="value" id="statNoLink">-</div>
-            <div class="sub">Criados por Automacao/Morada API</div>
-        </div>
-        <div class="stat-card green" onclick="setFilterFromCard('confirmacao')">
-            <div class="label">Confirmacao Reuniao Hoje</div>
-            <div class="value" id="statConfirmacao">-</div>
-            <div class="sub">Agendamento/reagendamento confirmado</div>
-        </div>
-        <div class="stat-card red" onclick="setFilterFromCard('stuck')">
-            <div class="label">Contatados Parados</div>
-            <div class="value" id="statStuck">-</div>
-            <div class="sub">Mais de 12h no estagio</div>
-        </div>
-        <div class="stat-card purple" onclick="setFilterFromCard('cadencia1')">
-            <div class="label">Cadencia Step 1</div>
-            <div class="value" id="statCad1">-</div>
-            <div class="sub">Deals no step 1</div>
-        </div>
-        <div class="stat-card purple" onclick="setFilterFromCard('cadencia2')">
-            <div class="label">Cadencia Step 2</div>
-            <div class="value" id="statCad2">-</div>
-            <div class="sub">Deals no step 2</div>
-        </div>
-        <div class="stat-card purple" onclick="setFilterFromCard('transferidos')">
-            <div class="label">Transferidos pos Cadencia</div>
-            <div class="value" id="statTransferidos">-</div>
-            <div class="sub">Cadencia 2 concluida, novo proprietario</div>
-        </div>
+    <div class="topbar-actions">
+        <button class="btn" onclick="refreshData()">&#8635; Atualizar</button>
+        <button class="btn" onclick="exportCSV()">&#8681; CSV</button>
     </div>
-
-    <!-- Filters -->
-    <div class="filters-bar">
-        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Filtros:</span>
-        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">Todos</button>
-        <button class="filter-btn" data-filter="no-link" onclick="setFilter('no-link', this)">Sem Link Conversa</button>
-        <button class="filter-btn" data-filter="confirmacao" onclick="setFilter('confirmacao', this)">Confirmacao Reuniao</button>
-        <button class="filter-btn" data-filter="stuck" onclick="setFilter('stuck', this)">Contatados Parados</button>
-        <button class="filter-btn" data-filter="cadencia" onclick="setFilter('cadencia', this)">Cadencia (todos)</button>
-        <button class="filter-btn" data-filter="cadencia1" onclick="setFilter('cadencia1', this)">Step 1</button>
-        <button class="filter-btn" data-filter="cadencia2" onclick="setFilter('cadencia2', this)">Step 2</button>
-        <button class="filter-btn" data-filter="transferidos" onclick="setFilter('transferidos', this)">Transferidos</button>
-    </div>
-    <div class="filters-bar" style="padding-top:0;">
-        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Funil:</span>
-        <button class="filter-btn active" data-pipeline="all" onclick="setPipeline('all', this)">Todos os Funis</button>
-        <span id="pipelineFilters" style="display:contents;"></span>
-    </div>
-    <div class="filters-bar" style="padding-top:0;">
-        <span style="color:#8b8fa3;font-size:12px;margin-right:4px;">Criado em:</span>
-        <input type="date" id="dateFrom" class="date-input" onchange="applyFilters()" />
-        <span style="color:#8b8fa3;font-size:12px;">ate</span>
-        <input type="date" id="dateTo" class="date-input" onchange="applyFilters()" />
-        <button class="filter-btn" onclick="setDatePreset('today')">Hoje</button>
-        <button class="filter-btn" onclick="setDatePreset('7d')">Ultimos 7 dias</button>
-        <button class="filter-btn" onclick="setDatePreset('30d')">Ultimos 30 dias</button>
-        <button class="filter-btn" onclick="setDatePreset('clear')">Limpar</button>
-    </div>
-
-    <!-- Debug & Error -->
-    <div class="debug-panel" id="debugPanel"></div>
-    <div class="error-msg" id="errorMsg"></div>
-
-    <!-- Table -->
-    <div class="table-container">
-        <div class="table-header">
-            <div>
-                <h2>Deals</h2>
-                <span class="count" id="tableCount">Carregando...</span>
-            </div>
-            <input type="text" class="search-input" placeholder="Buscar por titulo, pessoa, org..." oninput="onSearch(this.value)" />
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th onclick="sortBy('title')">Titulo</th>
-                    <th onclick="sortBy('person')">Pessoa</th>
-                    <th onclick="sortBy('org')">Organizacao</th>
-                    <th onclick="sortBy('pipeline')">Funil</th>
-                    <th onclick="sortBy('stage')">Estagio</th>
-                    <th onclick="sortBy('owner')">Proprietario</th>
-                    <th onclick="sortBy('link')">Link Conversa</th>
-                    <th onclick="sortBy('stepCadencia')">Step Cadencia</th>
-                    <th onclick="sortBy('dataCadencia')">Ultima Cadencia</th>
-                    <th onclick="sortBy('pularCadencia')">Pular Cadencia</th>
-                    <th onclick="sortBy('add_time')">Criado em</th>
-                </tr>
-            </thead>
-            <tbody id="dealsBody"></tbody>
-        </table>
-        <div class="empty-state" id="emptyState" style="display:none;">
-            <p>Nenhum deal encontrado com os filtros aplicados.</p>
-        </div>
-    </div>
-
-    <div class="pagination" id="pagination"></div>
 </div>
+
+<!-- KPI Cards -->
+<div class="kpi-row">
+    <div class="kpi-card orange" id="cardNoLink" onclick="selectTab('no-link')">
+        <div class="kpi-label">Sem Link de Conversa</div>
+        <div class="kpi-value" id="kpiNoLink">-</div>
+        <div class="kpi-sub">Deals criados por API sem link preenchido</div>
+        <div class="kpi-breakdown" id="breakdownNoLink"></div>
+    </div>
+    <div class="kpi-card purple" id="cardStep1" onclick="selectTab('step1')">
+        <div class="kpi-label">Cadencia Step 1</div>
+        <div class="kpi-value" id="kpiStep1">-</div>
+        <div class="kpi-sub">1a Tentativa MIA em andamento</div>
+        <div class="kpi-breakdown" id="breakdownStep1"></div>
+    </div>
+    <div class="kpi-card blue" id="cardStep2" onclick="selectTab('step2')">
+        <div class="kpi-label">Cadencia Step 2</div>
+        <div class="kpi-value" id="kpiStep2">-</div>
+        <div class="kpi-sub">2a Tentativa MIA em andamento</div>
+        <div class="kpi-breakdown" id="breakdownStep2"></div>
+    </div>
+    <div class="kpi-card green" id="cardTransferidos" onclick="selectTab('transferidos')">
+        <div class="kpi-label">Transferidos para SDRs</div>
+        <div class="kpi-value" id="kpiTransferidos">-</div>
+        <div class="kpi-sub">Cadencia finalizada, novo proprietario</div>
+        <div class="kpi-breakdown" id="breakdownTransferidos"></div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+    <span class="filter-label">Funil:</span>
+    <button class="filter-chip active" data-pipeline="all" onclick="setPipeline('all', this)">Todos</button>
+    <button class="filter-chip" data-pipeline="28" onclick="setPipeline(28, this)">Vendas Spot</button>
+    <button class="filter-chip" data-pipeline="37" onclick="setPipeline(37, this)">Marketplace</button>
+    <button class="filter-chip" data-pipeline="44" onclick="setPipeline(44, this)">Comercial Decor</button>
+    <button class="filter-chip" data-pipeline="14" onclick="setPipeline(14, this)">Comercial SZS</button>
+    <input type="text" class="search-box" placeholder="Buscar deal, pessoa, org..." oninput="onSearch(this.value)" />
+</div>
+
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- Table Section -->
+<div class="section">
+    <div class="section-header">
+        <h2 id="sectionTitle">Sem Link de Conversa</h2>
+        <span class="count" id="sectionCount">0 deals</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th onclick="sortBy('title')">Deal</th>
+                <th onclick="sortBy('person')">Pessoa</th>
+                <th onclick="sortBy('org')">Organizacao</th>
+                <th onclick="sortBy('pipeline')">Funil</th>
+                <th onclick="sortBy('stage')">Estagio</th>
+                <th onclick="sortBy('owner')">Proprietario</th>
+                <th onclick="sortBy('link')">Link Conversa</th>
+                <th onclick="sortBy('stepCadencia')">Cadencia</th>
+                <th onclick="sortBy('add_time')">Criado em</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;">Nenhum deal encontrado.</div>
+</div>
+<div class="pagination" id="pagination"></div>
 
 <!-- Loading -->
 <div class="loading-overlay" id="loading">
@@ -539,384 +342,236 @@
     <div class="loading-text" id="loadingText">Carregando dados do Pipedrive...</div>
 </div>
 
-<!-- Config Modal -->
-<div class="modal-overlay" id="configModal">
-    <div class="modal">
-        <h2>Configurar Campos Customizados</h2>
-        <p style="font-size:13px; color:#8b8fa3; margin-bottom:16px;">
-            Ajuste os campos customizados se necessario. Os campos foram pre-configurados.
-        </p>
-
-        <label>Campo: Link da Conversa</label>
-        <select id="cfgLinkConversa"></select>
-
-        <label>Campo: Step Cadencia (numerico)</label>
-        <select id="cfgStepCadencia"></select>
-
-        <label>Campo: Data Ultima Cadencia</label>
-        <select id="cfgDataCadencia"></select>
-
-        <label>Campo: Pular Cadencia</label>
-        <select id="cfgPularCadencia"></select>
-
-        <label>Campo: Respondeu MIA</label>
-        <select id="cfgRespondeuMia"></select>
-
-        <label>Nome do estagio "Contatados" (busca parcial)</label>
-        <input type="text" id="cfgContatadosStage" value="Contatados" />
-
-        <label style="margin-top:16px; font-weight:600; color:#fff;">Todos os campos da conta:</label>
-        <div class="scroll-list" id="fieldsList"></div>
-
-        <div class="modal-actions">
-            <button class="btn-secondary" onclick="closeConfig()">Cancelar</button>
-            <button class="btn-save" onclick="saveConfig()">Salvar e Recarregar</button>
-        </div>
-    </div>
-</div>
-
 <script>
 // ==================== CONFIG ====================
-const NEKT_API_URL = 'https://api.nekt.ai/api/v1/sql-query/';
-const NEKT_API_KEY = 'TF7hnGP1pxcxCLofkC1gaySaqEWg8BbbawWzniVUI2lccGvZqigw81uXY1DsVlW2zYYezyW1QQydT0hmCI6DmoSmkbUrSgwL9pM5MtOmbBDS1QiP2Z4mk4cXs037gdrA1xoQbiHw2BqXsfGSACfRlfYRTdTfylNoIvPQAG61COK0N636CIRhJShpE2xjlzUxlowWFejN0sy8GiWJM4rGCTqFdnwH6A5MTWsZggYjsQjb4J0xkaD5WEtWdkd88Chq';
-const SUBDOMAIN = 'seazone-fd92b9';
+var API_TOKEN = 'd0f4e60217b80d740c8c4c969af4a60108567332';
+var API_DOMAIN = 'https://seazone-fd92b9.pipedrive.com';
+var SUBDOMAIN = 'seazone-fd92b9';
 
-// Known user IDs
-const CREATOR_AUTOMACAO_ID = 25546644;  // "Automacao"
-const CREATOR_MORADA_ID = 21490680;     // "Morada - Mia"
+var CF_LINK_CONVERSA = '3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc';
+var CF_STEP_CADENCIA = '90db11111ad88f60a3346d04df252660832285ec';
+var CF_DATA_CADENCIA = '85b830218feefa6ab8f7186f053a2d84b1b0bd2e';
+var CF_PULAR_CADENCIA = '5502ecbc173d31de563ecb294e5f04e1394091e6';
+var CF_RESPONDEU_MIA = '34336364766f24e1b2fdb25beec9c87856f3ade3';
 
-// Only these pipelines
-const ALLOWED_PIPELINES = {
-    28: 'Vendas Spot',
-    14: 'Comercial SZS',
-    44: 'Comercial Decor',
-    37: 'Marketplace',
-};
+var AUTOMACAO_ID = 25546644;
+var MORADA_ID = 21490680;
 
-// Contatados stage name match
-const CONTATADOS_STAGE = 'Contatados';
+var PIPELINES = { 28: 'Vendas Spot', 14: 'Comercial SZS', 44: 'Comercial Decor', 37: 'Marketplace' };
+var PIPELINE_IDS = [28, 14, 44, 37];
 
 // ==================== STATE ====================
-let allDeals = [];
-let filteredDeals = [];
-let stages = {};      // id -> { name, pipeline_id }
-let pipelines = {};   // id -> name (from ALLOWED_PIPELINES)
-let users = {};
-let currentFilter = 'all';
-let currentPipeline = 'all';
-let searchTerm = '';
-let sortField = 'add_time';
-let sortDir = 'desc';
-let page = 1;
-const PAGE_SIZE = 50;
-let confirmacaoDeals = new Set(); // deal IDs with confirmation note today
-let cadenciaStepMap = {};          // deal_id -> computed cadencia step from activities
-let debugLogs = [];
+var allDeals = [];
+var currentTab = 'no-link';
+var currentPipeline = 'all';
+var searchTerm = '';
+var sortField = 'add_time';
+var sortDir = 'desc';
+var page = 1;
+var PAGE_SIZE = 50;
+var stages = {};
+var users = {};
+var cadenciaMap = {};
 
-// ==================== NEKT DATA API ====================
-function parseCSV(text) {
-    const lines = text.split('\n').filter(l => l.trim());
-    if (lines.length === 0) return [];
-    // Parse header
-    const headers = parseCSVLine(lines[0]);
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
-        const obj = {};
-        headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
-        rows.push(obj);
-    }
-    return rows;
+// ==================== PIPEDRIVE API ====================
+async function apiFetch(endpoint, params) {
+    params = params || {};
+    var url = new URL(API_DOMAIN + '/api/v1' + endpoint);
+    url.searchParams.set('api_token', API_TOKEN);
+    for (var k in params) url.searchParams.set(k, String(params[k]));
+    var res = await fetch(url.toString());
+    if (!res.ok) throw new Error('Pipedrive API ' + res.status);
+    return res.json();
 }
 
-function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (inQuotes) {
-            if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
-            else if (ch === '"') { inQuotes = false; }
-            else { current += ch; }
-        } else {
-            if (ch === '"') { inQuotes = true; }
-            else if (ch === ',') { result.push(current); current = ''; }
-            else { current += ch; }
-        }
+async function apiFetchAll(endpoint, params) {
+    params = params || {};
+    var all = [];
+    var start = 0;
+    var more = true;
+    while (more) {
+        var p = Object.assign({}, params, { start: start, limit: 500 });
+        var r = await apiFetch(endpoint, p);
+        if (r.success && r.data) {
+            all = all.concat(r.data);
+        } else break;
+        more = r.additional_data && r.additional_data.pagination
+            ? r.additional_data.pagination.more_items_in_collection : false;
+        start = (r.additional_data && r.additional_data.pagination && r.additional_data.pagination.next_start)
+            ? r.additional_data.pagination.next_start : start + 500;
     }
-    result.push(current);
-    return result;
+    return all;
 }
 
-async function nektQuery(sql, label) {
-    logDebug(`${label}: executando query...`);
-    const res = await fetch(NEKT_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': NEKT_API_KEY },
-        body: JSON.stringify({ sql })
-    });
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Nekt API ${res.status}: ${errText.substring(0, 200)}`);
-    }
-    const json = await res.json();
-    if (json.state === 'FAILED') throw new Error(`SQL erro: ${json.state_change_reason || 'desconhecido'}`);
-    if (json.state !== 'SUCCEEDED' || !json.presigned_urls || json.presigned_urls.length === 0) {
-        throw new Error(`Nekt query estado inesperado: ${json.state}`);
-    }
-    // Download CSV from presigned URL
-    const csvRes = await fetch(json.presigned_urls[0]);
-    if (!csvRes.ok) throw new Error(`Erro ao baixar CSV: ${csvRes.status}`);
-    const csvText = await csvRes.text();
-    const rows = parseCSV(csvText);
-    logDebug(`${label}: ${rows.length} registros carregados (${Math.round(json.data_scanned_in_bytes / 1024)}KB scanned, ${json.execution_time_in_millis}ms)`, 'ok');
-    return rows;
-}
-
-// ==================== DATA LOADING ====================
+// ==================== LOAD DATA ====================
 async function refreshData() {
-    debugLogs = [];
-    showLoading('Inicializando conexao MCP...');
-    logDebug('Iniciando carregamento via Nekt MCP...');
-
+    showLoading('Conectando ao Pipedrive...');
     try {
-        // Load stages, users in parallel
+        // Stages + Users in parallel
         showLoading('Carregando estagios e usuarios...');
+        var stageProms = PIPELINE_IDS.map(function(pid) {
+            return apiFetchAll('/stages', { pipeline_id: pid });
+        });
+        var results = await Promise.all([apiFetchAll('/users')].concat(stageProms));
+        var usersData = results[0];
+        var stageArrays = results.slice(1);
 
-        const [stagesRows, usersRows] = await Promise.all([
-            nektQuery(`SELECT id, name, pipeline_id FROM nekt_trusted.pipedrive_szs_stages WHERE active_flag = true`, 'Stages'),
-            nektQuery(`SELECT id, name FROM nekt_trusted.pipedrive_v2_users WHERE active_flag = true`, 'Users')
-        ]);
-
-        // Build stages map
         stages = {};
-        stagesRows.forEach(s => {
-            const id = parseInt(s.id, 10);
-            stages[id] = { name: s.name || '', pipeline_id: parseInt(s.pipeline_id, 10) || null };
+        stageArrays.forEach(function(arr) {
+            (arr || []).forEach(function(s) { stages[s.id] = { name: s.name, pipeline_id: s.pipeline_id }; });
         });
-        logDebug(`${Object.keys(stages).length} estagios carregados`, 'ok');
 
-        // Build pipelines map from ALLOWED_PIPELINES constant
-        pipelines = { ...ALLOWED_PIPELINES };
-        logDebug(`${Object.keys(pipelines).length} pipelines configurados`, 'ok');
-
-        // Build users map
         users = {};
-        usersRows.forEach(u => {
-            const id = parseInt(u.id, 10);
-            users[id] = u.name || '';
-        });
-        logDebug(`${Object.keys(users).length} usuarios carregados`, 'ok');
+        (usersData || []).forEach(function(u) { users[u.id] = u.name; });
 
-        // Verify known users
-        logDebug(`User Automacao (${CREATOR_AUTOMACAO_ID}): "${users[CREATOR_AUTOMACAO_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_AUTOMACAO_ID] ? 'ok' : 'err');
-        logDebug(`User Morada-Mia (${CREATOR_MORADA_ID}): "${users[CREATOR_MORADA_ID] || 'NAO ENCONTRADO'}"`, users[CREATOR_MORADA_ID] ? 'ok' : 'err');
-
-        // Load deals with custom fields + person/org names via JOIN
+        // Deals from all pipelines
         showLoading('Carregando deals abertos...');
-        const dealsRows = await nektQuery(
-            `SELECT d.id, d.title, d.creator_user_id, d.owner_id, d.pipeline_id, d.stage_id, d.status, d.add_time, d.update_time, d.stage_change_time, d.person_id, d.org_id, d.label_ids,
-  d.custom_fields."3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc" AS link_conversa,
-  d.custom_fields."90db11111ad88f60a3346d04df252660832285ec" AS step_cadencia,
-  d.custom_fields."85b830218feefa6ab8f7186f053a2d84b1b0bd2e" AS data_cadencia,
-  d.custom_fields."5502ecbc173d31de563ecb294e5f04e1394091e6" AS pular_cadencia,
-  d.custom_fields."34336364766f24e1b2fdb25beec9c87856f3ade3" AS respondeu_mia,
-  p.name AS person_name,
-  o.name AS org_name
-FROM nekt_trusted.pipedrive_v2_deals d
-LEFT JOIN nekt_trusted.pipedrive_v2_persons p ON d.person_id = p.id
-LEFT JOIN nekt_trusted.pipedrive_v2_organizations o ON d.org_id = o.id
-WHERE d.status = 'open' AND d.pipeline_id IN (28, 14, 44, 37)`,
-            'Deals'
-        );
-        logDebug(`Total de deals abertos nos funis permitidos: ${dealsRows.length}`, dealsRows.length > 0 ? 'ok' : 'warn');
-
-        // Load today's confirmation notes
-        showLoading('Carregando notas de confirmacao...');
-        const notesRows = await nektQuery(
-            `SELECT DISTINCT deal_id FROM nekt_trusted.pipedrive_v2_notes
-WHERE CAST(add_time AS DATE) = CURRENT_DATE
-AND (content LIKE '%Confirmação de Agendamento via automação%' OR content LIKE '%Confirmação de Reagendamento via automação%')`,
-            'Notas confirmacao'
-        );
-        confirmacaoDeals = new Set();
-        notesRows.forEach(n => {
-            if (n.deal_id) confirmacaoDeals.add(parseInt(n.deal_id, 10));
+        var dealProms = PIPELINE_IDS.map(function(pid) {
+            return apiFetchAll('/deals', { pipeline_id: pid, status: 'open' });
         });
-        logDebug(`Notas de confirmacao hoje: ${confirmacaoDeals.size} deals`, confirmacaoDeals.size > 0 ? 'ok' : 'warn');
+        var dealArrays = await Promise.all(dealProms);
+        var rawDeals = [].concat.apply([], dealArrays);
 
-        // Load cadencia activities (last 4 days)
+        // Activities for cadencia (last 4 days)
         showLoading('Carregando atividades de cadencia...');
-        const activitiesRows = await nektQuery(
-            `SELECT deal_id, subject FROM nekt_trusted.pipedrive_v2_activities
-WHERE user_id = 25546644
-AND CAST(add_time AS DATE) >= CURRENT_DATE - INTERVAL '4' DAY
-AND subject LIKE '%Tentativa de contato pela MIA%'`,
-            'Atividades cadencia'
-        );
-        cadenciaStepMap = {};
-        activitiesRows.forEach(act => {
-            if (!act.deal_id || !act.subject) return;
-            const match = act.subject.match(/^(\d+)/);
-            if (!match) return;
-            const attemptNum = parseInt(match[1], 10);
-            const dealId = parseInt(act.deal_id, 10);
-            cadenciaStepMap[dealId] = Math.max(cadenciaStepMap[dealId] || 0, attemptNum);
+        cadenciaMap = {};
+        try {
+            var fourAgo = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+            var today = new Date().toISOString().slice(0, 10);
+            var acts = await apiFetchAll('/activities', {
+                user_id: AUTOMACAO_ID,
+                start_date: fourAgo,
+                end_date: today
+            });
+            (acts || []).forEach(function(a) {
+                if (!a.deal_id || !a.subject) return;
+                if (a.subject.indexOf('Tentativa de contato pela MIA') === -1) return;
+                var m = a.subject.match(/^(\d+)/);
+                if (!m) return;
+                var n = parseInt(m[1], 10);
+                cadenciaMap[a.deal_id] = Math.max(cadenciaMap[a.deal_id] || 0, n);
+            });
+        } catch (e) { /* non-critical */ }
+
+        // Filter: only deals created by Automacao or Morada
+        allDeals = [];
+        rawDeals.forEach(function(d) {
+            var creatorId = (typeof d.creator_user_id === 'object' && d.creator_user_id)
+                ? d.creator_user_id.id : d.creator_user_id;
+            if (creatorId !== AUTOMACAO_ID && creatorId !== MORADA_ID) return;
+
+            var ownerId = (typeof d.user_id === 'object' && d.user_id) ? d.user_id.id : d.user_id;
+            var ownerName = (typeof d.user_id === 'object' && d.user_id) ? d.user_id.name : (users[ownerId] || '');
+            var personName = (typeof d.person_id === 'object' && d.person_id) ? d.person_id.name : '';
+            var orgName = (typeof d.org_id === 'object' && d.org_id) ? d.org_id.name : '';
+            var si = stages[d.stage_id] || { name: 'Stage ' + d.stage_id, pipeline_id: d.pipeline_id };
+            var link = (d[CF_LINK_CONVERSA] || '').toString().trim();
+
+            var maxAttempt = cadenciaMap[d.id] || 0;
+            var rawStep = parseFloat(d[CF_STEP_CADENCIA]) || 0;
+            var step = maxAttempt >= 2 ? 2 : maxAttempt >= 1 ? 1 : rawStep;
+
+            var isAutomacao = ownerId === AUTOMACAO_ID;
+            var isMorada = ownerId === MORADA_ID;
+
+            allDeals.push({
+                id: d.id,
+                title: d.title || '',
+                person: personName || '',
+                org: orgName || '',
+                pipeline: PIPELINES[d.pipeline_id] || ('Pipeline ' + d.pipeline_id),
+                pipelineId: d.pipeline_id,
+                stage: si.name,
+                owner: ownerName || '',
+                ownerId: ownerId,
+                isAutomacao: isAutomacao,
+                isMorada: isMorada,
+                link: link,
+                stepCadencia: step,
+                dataCadencia: d[CF_DATA_CADENCIA] || '',
+                add_time: d.add_time || '',
+            });
         });
-        logDebug(`Cadencia calculada (ultimos 4 dias): ${Object.keys(cadenciaStepMap).length} deals com atividades`, 'ok');
 
-        // Normalize deals
-        allDeals = dealsRows.map(normalizeDeal);
-
-        const countAutomacao = allDeals.filter(d => d.isAutomacao).length;
-        const countMorada = allDeals.filter(d => d.isMorada).length;
-        const countOutros = allDeals.filter(d => !d.isAutomacao && !d.isMorada).length;
-        logDebug(`Proprietarios - Automacao: ${countAutomacao}, Morada-Mia: ${countMorada}, Outros: ${countOutros}`, 'ok');
-
-        // Log sample
-        if (allDeals.length > 0) {
-            const sample = allDeals[0];
-            logDebug(`Amostra - titulo: "${sample.title}", proprietario: "${sample.owner}", pipeline: "${sample.pipeline}", stage: "${sample.stage}", link: "${sample.link || 'VAZIO'}", step: ${sample.stepCadencia}`);
-        }
-
-        renderPipelineButtons();
-        applyFilters();
-        updateStats();
+        updateAll();
         hideLoading();
+        document.getElementById('lastUpdated').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + ' | ' + allDeals.length + ' deals criados por API';
     } catch (e) {
         hideLoading();
-        showError('Erro ao carregar dados: ' + e.message);
-        logDebug('ERRO: ' + e.message, 'err');
+        showError('Erro: ' + e.message);
         console.error(e);
     }
-
-    renderDebug();
 }
 
-function normalizeDeal(d) {
-    const ownerId = d.owner_id ? parseInt(d.owner_id, 10) : null;
-    const ownerName = ownerId ? (users[ownerId] || '') : '';
-    const personName = d.person_name || '';
-    const orgName = d.org_name || '';
-    const stageId = d.stage_id ? parseInt(d.stage_id, 10) : null;
-    const stageInfo = stageId ? (stages[stageId] || { name: `Stage ${stageId}`, pipeline_id: null }) : { name: '', pipeline_id: null };
-    const stageName = stageInfo.name;
-    const pipelineId = d.pipeline_id ? parseInt(d.pipeline_id, 10) : (stageInfo.pipeline_id || null);
-    const pipelineName = pipelineId ? (pipelines[pipelineId] || `Pipeline ${pipelineId}`) : '';
+// ==================== CATEGORIZATION ====================
+function getDealsForTab(tab, pipelineFilter) {
+    var base = allDeals;
+    if (pipelineFilter !== 'all') {
+        base = base.filter(function(d) { return d.pipelineId === pipelineFilter; });
+    }
+    switch (tab) {
+        case 'no-link':
+            return base.filter(function(d) { return !d.link; });
+        case 'step1':
+            return base.filter(function(d) { return (d.isAutomacao || d.isMorada) && d.stepCadencia === 1; });
+        case 'step2':
+            return base.filter(function(d) { return (d.isAutomacao || d.isMorada) && d.stepCadencia === 2; });
+        case 'transferidos':
+            return base.filter(function(d) { return d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada; });
+        default:
+            return base;
+    }
+}
 
-    const linkValue = (d.link_conversa || '').toString().trim();
-    const dealId = parseInt(d.id, 10);
+function getPipelineBreakdown(tab) {
+    var counts = {};
+    PIPELINE_IDS.forEach(function(pid) {
+        var c = getDealsForTab(tab, pid).length;
+        if (c > 0) counts[PIPELINES[pid]] = c;
+    });
+    return counts;
+}
 
-    // Use max attempt number from activities (last 4 days) to determine cadencia step
-    const maxAttempt = cadenciaStepMap[dealId] || 0;
-    const rawStep = parseFloat(d.step_cadencia) || 0;
-    const stepCadencia = maxAttempt >= 2 ? 2 : maxAttempt >= 1 ? 1 : rawStep;
-    const dataCadencia = d.data_cadencia || '';
-    const pularCadencia = d.pular_cadencia || '';
-    const respondeuMia = d.respondeu_mia || '';
+// ==================== UI UPDATE ====================
+function updateAll() {
+    updateKPIs();
+    applyFilters();
+}
 
-    const isAutomacao = ownerId === CREATOR_AUTOMACAO_ID;
-    const isMorada = ownerId === CREATOR_MORADA_ID;
-    const creatorId = d.creator_user_id ? parseInt(d.creator_user_id, 10) : null;
-    const createdByApi = creatorId === CREATOR_AUTOMACAO_ID || creatorId === CREATOR_MORADA_ID;
+function updateKPIs() {
+    var tabs = ['no-link', 'step1', 'step2', 'transferidos'];
+    var ids = ['kpiNoLink', 'kpiStep1', 'kpiStep2', 'kpiTransferidos'];
+    var breakdownIds = ['breakdownNoLink', 'breakdownStep1', 'breakdownStep2', 'breakdownTransferidos'];
 
-    const hasConfirmacao = confirmacaoDeals.has(dealId);
+    tabs.forEach(function(tab, i) {
+        var count = getDealsForTab(tab, 'all').length;
+        document.getElementById(ids[i]).textContent = count;
 
-    // Parse stage_change_time for hours-in-stage calculation
-    let hoursInStage = 0;
-    if (d.stage_change_time) {
-        const sct = new Date(d.stage_change_time);
-        if (!isNaN(sct.getTime())) {
-            hoursInStage = (Date.now() - sct.getTime()) / 3600000;
+        var bd = getPipelineBreakdown(tab);
+        var html = '';
+        for (var name in bd) {
+            html += '<span class="kpi-tag">' + esc(name) + ': ' + bd[name] + '</span>';
         }
-    }
+        document.getElementById(breakdownIds[i]).innerHTML = html;
+    });
 
-    return {
-        id: dealId,
-        title: d.title || '',
-        person: personName,
-        org: orgName,
-        pipeline: pipelineName,
-        pipelineId,
-        stage: stageName,
-        stageId,
-        owner: ownerName,
-        ownerId,
-        createdByApi,
-        link: linkValue,
-        stepCadencia,
-        dataCadencia,
-        pularCadencia: String(pularCadencia || ''),
-        respondeuMia,
-        add_time: d.add_time || '',
-        stage_change_time: d.stage_change_time || '',
-        hoursInStage,
-        hasConfirmacao,
-        isAutomacao,
-        isMorada,
-    };
+    // Active card highlight
+    document.querySelectorAll('.kpi-card').forEach(function(c) { c.classList.remove('active'); });
+    var cardMap = { 'no-link': 'cardNoLink', 'step1': 'cardStep1', 'step2': 'cardStep2', 'transferidos': 'cardTransferidos' };
+    if (cardMap[currentTab]) document.getElementById(cardMap[currentTab]).classList.add('active');
 }
 
-// ==================== FILTERS ====================
-function setFilter(filter, btn) {
-    currentFilter = filter;
-    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    else {
-        document.querySelectorAll('[data-filter]').forEach(b => {
-            if (b.dataset.filter === filter) b.classList.add('active');
-        });
-    }
+function selectTab(tab) {
+    currentTab = tab;
     page = 1;
+    updateKPIs();
     applyFilters();
 }
 
-function setPipeline(pipelineId, btn) {
-    currentPipeline = pipelineId;
-    document.querySelectorAll('[data-pipeline]').forEach(b => b.classList.remove('active'));
+function setPipeline(pid, btn) {
+    currentPipeline = pid === 'all' ? 'all' : Number(pid);
+    document.querySelectorAll('[data-pipeline]').forEach(function(b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
-    page = 1;
-    applyFilters();
-}
-
-function setFilterFromCard(filter) {
-    setFilter(filter, null);
-}
-
-function renderPipelineButtons() {
-    const pipelineIds = [...new Set(allDeals.map(d => d.pipelineId).filter(Boolean))];
-    const container = document.getElementById('pipelineFilters');
-    container.innerHTML = pipelineIds.map(pid => {
-        const name = pipelines[pid] || `Pipeline ${pid}`;
-        const count = allDeals.filter(d => d.pipelineId === pid).length;
-        return `<button class="filter-btn" data-pipeline="${pid}" onclick="setPipeline(${pid}, this)">${escapeHtml(name)} (${count})</button>`;
-    }).join('');
-}
-
-function setDatePreset(preset) {
-    const from = document.getElementById('dateFrom');
-    const to = document.getElementById('dateTo');
-    const today = new Date().toISOString().slice(0, 10);
-
-    switch (preset) {
-        case 'today':
-            from.value = today;
-            to.value = today;
-            break;
-        case '7d':
-            from.value = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-            to.value = today;
-            break;
-        case '30d':
-            from.value = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-            to.value = today;
-            break;
-        case 'clear':
-            from.value = '';
-            to.value = '';
-            break;
-    }
     page = 1;
     applyFilters();
 }
@@ -927,59 +582,21 @@ function onSearch(val) {
     applyFilters();
 }
 
-// Shared filter functions
-const FILTERS = {
-    'no-link': d => d.createdByApi && !d.link,
-    'confirmacao': d => d.hasConfirmacao,
-    'stuck': d => (d.isAutomacao || d.isMorada) && d.stage.toLowerCase().includes(CONTATADOS_STAGE.toLowerCase()) && d.hoursInStage > 12,
-    'cadencia': d => (d.isAutomacao || d.isMorada) && d.stepCadencia > 0,
-    'cadencia1': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 1,
-    'cadencia2': d => (d.isAutomacao || d.isMorada) && d.stepCadencia === 2,
-    'transferidos': d => d.createdByApi && d.stepCadencia >= 2 && !d.isAutomacao && !d.isMorada,
-};
-
-const ALL_OWNERS_FILTERS = new Set(['all', 'no-link', 'confirmacao', 'transferidos']);
-
-function getBaseDeals(forFilter) {
-    let base = [...allDeals];
-    if (currentPipeline !== 'all') {
-        base = base.filter(d => d.pipelineId === currentPipeline);
-    }
-    const dateFrom = document.getElementById('dateFrom').value;
-    const dateTo = document.getElementById('dateTo').value;
-    if (dateFrom) {
-        base = base.filter(d => d.add_time >= dateFrom);
-    }
-    if (dateTo) {
-        base = base.filter(d => d.add_time <= dateTo + 'T23:59:59');
-    }
-    if (!ALL_OWNERS_FILTERS.has(forFilter)) {
-        base = base.filter(d => d.isAutomacao || d.isMorada);
-    }
-    return base;
-}
-
 function applyFilters() {
-    let result = getBaseDeals(currentFilter);
-
-    if (currentFilter !== 'all' && FILTERS[currentFilter]) {
-        result = result.filter(FILTERS[currentFilter]);
-    }
+    var deals = getDealsForTab(currentTab, currentPipeline);
 
     if (searchTerm) {
-        result = result.filter(d =>
-            d.title.toLowerCase().includes(searchTerm) ||
-            d.person.toLowerCase().includes(searchTerm) ||
-            d.org.toLowerCase().includes(searchTerm) ||
-            d.owner.toLowerCase().includes(searchTerm) ||
-            d.stage.toLowerCase().includes(searchTerm) ||
-            d.pipeline.toLowerCase().includes(searchTerm)
-        );
+        deals = deals.filter(function(d) {
+            return d.title.toLowerCase().indexOf(searchTerm) !== -1 ||
+                d.person.toLowerCase().indexOf(searchTerm) !== -1 ||
+                d.org.toLowerCase().indexOf(searchTerm) !== -1 ||
+                d.owner.toLowerCase().indexOf(searchTerm) !== -1;
+        });
     }
 
-    result.sort((a, b) => {
-        let va = a[sortField] ?? '';
-        let vb = b[sortField] ?? '';
+    deals.sort(function(a, b) {
+        var va = a[sortField] != null ? a[sortField] : '';
+        var vb = b[sortField] != null ? b[sortField] : '';
         if (typeof va === 'string') va = va.toLowerCase();
         if (typeof vb === 'string') vb = vb.toLowerCase();
         if (va < vb) return sortDir === 'asc' ? -1 : 1;
@@ -987,243 +604,118 @@ function applyFilters() {
         return 0;
     });
 
-    filteredDeals = result;
-    updateStats();
-    renderTable();
-    renderPagination();
-    document.getElementById('tableCount').textContent = `${result.length} deal(s) encontrado(s)`;
+    var titles = { 'no-link': 'Sem Link de Conversa', 'step1': 'Cadencia Step 1 - 1a Tentativa MIA', 'step2': 'Cadencia Step 2 - 2a Tentativa MIA', 'transferidos': 'Transferidos para SDRs' };
+    document.getElementById('sectionTitle').textContent = titles[currentTab] || '';
+    document.getElementById('sectionCount').textContent = deals.length + ' deal(s)';
+
+    renderTable(deals);
+    renderPagination(deals.length);
 }
 
 function sortBy(field) {
-    if (sortField === field) {
-        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-        sortField = field;
-        sortDir = field === 'add_time' ? 'desc' : 'asc';
-    }
+    if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortField = field; sortDir = field === 'add_time' ? 'desc' : 'asc'; }
     applyFilters();
 }
 
-// ==================== RENDER ====================
-function renderTable() {
-    const tbody = document.getElementById('dealsBody');
-    const start = (page - 1) * PAGE_SIZE;
-    const pageDeals = filteredDeals.slice(start, start + PAGE_SIZE);
+// ==================== TABLE ====================
+function renderTable(deals) {
+    var tbody = document.getElementById('tableBody');
+    var startIdx = (page - 1) * PAGE_SIZE;
+    var slice = deals.slice(startIdx, startIdx + PAGE_SIZE);
 
-    if (pageDeals.length === 0) {
+    if (slice.length === 0) {
         tbody.innerHTML = '';
         document.getElementById('emptyState').style.display = 'block';
         return;
     }
-
     document.getElementById('emptyState').style.display = 'none';
 
-    tbody.innerHTML = pageDeals.map(d => {
-        const linkCell = d.link
-            ? `<td class="link-ok"><a href="${escapeHtml(d.link)}" target="_blank" title="${escapeHtml(d.link)}">${truncate(d.link, 30)}</a></td>`
-            : `<td class="link-empty">Vazio</td>`;
+    tbody.innerHTML = slice.map(function(d) {
+        var linkCell = d.link
+            ? '<a href="' + esc(d.link) + '" target="_blank" style="color:#4f8ff7;text-decoration:none;" title="' + esc(d.link) + '">' + trunc(d.link, 25) + '</a>'
+            : '<span class="text-empty">Vazio</span>';
 
-        const ownerBadge = d.isAutomacao
+        var ownerClass = (!d.isAutomacao && !d.isMorada) ? ' class="owner-sdr"' : '';
+        var ownerBadge = d.isAutomacao
             ? '<span class="badge badge-blue">Automacao</span>'
             : d.isMorada
-            ? '<span class="badge badge-orange">Morada - Mia</span>'
-            : `<span class="badge badge-gray">${escapeHtml(truncate(d.owner, 20))}</span>`;
+            ? '<span class="badge badge-orange">Morada-Mia</span>'
+            : '<span class="badge badge-green">' + esc(trunc(d.owner, 18)) + '</span>';
 
-        const stepBadge = d.stepCadencia > 0
-            ? `<span class="badge badge-purple">Step ${d.stepCadencia}</span>`
+        var stepBadge = d.stepCadencia >= 2
+            ? '<span class="badge badge-purple">Step 2</span>'
+            : d.stepCadencia >= 1
+            ? '<span class="badge badge-purple">Step 1</span>'
             : '<span class="badge badge-gray">-</span>';
 
-        const pularBadge = d.pularCadencia && d.pularCadencia !== '-' && d.pularCadencia !== ''
-            ? `<span class="badge badge-red">${escapeHtml(d.pularCadencia)}</span>`
-            : '<span class="badge badge-gray">-</span>';
+        var date = d.add_time ? new Date(d.add_time).toLocaleDateString('pt-BR') : '-';
 
-        const date = d.add_time ? new Date(d.add_time).toLocaleDateString('pt-BR') : '-';
-        const dataCad = d.dataCadencia ? new Date(d.dataCadencia).toLocaleDateString('pt-BR') : '-';
-
-        return `<tr>
-            <td title="${escapeHtml(d.title)}"><a href="https://${SUBDOMAIN}.pipedrive.com/deal/${d.id}" target="_blank" style="color:#4f8ff7;text-decoration:none;">${escapeHtml(truncate(d.title, 35))}</a></td>
-            <td title="${escapeHtml(d.person)}">${escapeHtml(truncate(d.person, 25))}</td>
-            <td title="${escapeHtml(d.org)}">${escapeHtml(truncate(d.org, 25))}</td>
-            <td><span class="badge badge-green">${escapeHtml(truncate(d.pipeline, 20))}</span></td>
-            <td>${escapeHtml(d.stage)}</td>
-            <td>${ownerBadge}</td>
-            ${linkCell}
-            <td>${stepBadge}</td>
-            <td>${dataCad}</td>
-            <td>${pularBadge}</td>
-            <td>${date}</td>
-        </tr>`;
+        return '<tr>' +
+            '<td><a class="link-deal" href="https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id + '" target="_blank" title="' + esc(d.title) + '">' + esc(trunc(d.title, 30)) + '</a></td>' +
+            '<td title="' + esc(d.person) + '">' + esc(trunc(d.person, 22)) + '</td>' +
+            '<td title="' + esc(d.org) + '">' + esc(trunc(d.org, 22)) + '</td>' +
+            '<td><span class="badge badge-gray">' + esc(trunc(d.pipeline, 18)) + '</span></td>' +
+            '<td>' + esc(d.stage) + '</td>' +
+            '<td>' + ownerBadge + '</td>' +
+            '<td>' + linkCell + '</td>' +
+            '<td>' + stepBadge + '</td>' +
+            '<td>' + date + '</td>' +
+            '</tr>';
     }).join('');
 }
 
-function renderPagination() {
-    const total = Math.ceil(filteredDeals.length / PAGE_SIZE);
-    const container = document.getElementById('pagination');
-    if (total <= 1) { container.innerHTML = ''; return; }
-
-    let html = `<button ${page <= 1 ? 'disabled' : ''} onclick="goPage(${page - 1})">&laquo;</button>`;
-    for (let i = 1; i <= total; i++) {
-        if (total > 7 && Math.abs(i - page) > 2 && i !== 1 && i !== total) {
-            if (i === page - 3 || i === page + 3) html += '<button disabled>...</button>';
+function renderPagination(total) {
+    var pages = Math.ceil(total / PAGE_SIZE);
+    var c = document.getElementById('pagination');
+    if (pages <= 1) { c.innerHTML = ''; return; }
+    var h = '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (page - 1) + ')">&laquo;</button>';
+    for (var i = 1; i <= pages; i++) {
+        if (pages > 7 && Math.abs(i - page) > 2 && i !== 1 && i !== pages) {
+            if (i === page - 3 || i === page + 3) h += '<button disabled>...</button>';
             continue;
         }
-        html += `<button class="${i === page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+        h += '<button class="' + (i === page ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
     }
-    html += `<button ${page >= total ? 'disabled' : ''} onclick="goPage(${page + 1})">&raquo;</button>`;
-    container.innerHTML = html;
+    h += '<button ' + (page >= pages ? 'disabled' : '') + ' onclick="goPage(' + (page + 1) + ')">&raquo;</button>';
+    c.innerHTML = h;
 }
 
 function goPage(p) {
     page = p;
-    renderTable();
-    renderPagination();
-    window.scrollTo({ top: document.querySelector('.table-container').offsetTop - 20, behavior: 'smooth' });
-}
-
-// ==================== STATS ====================
-function updateStats() {
-    const baseOwner = getBaseDeals('stuck');
-    const baseNoLink = getBaseDeals('no-link');
-
-    document.getElementById('statTotal').textContent = baseOwner.length;
-    document.getElementById('statNoLink').textContent = baseNoLink.filter(FILTERS['no-link']).length;
-    const baseConfirmacao = getBaseDeals('confirmacao');
-    document.getElementById('statConfirmacao').textContent = baseConfirmacao.filter(FILTERS['confirmacao']).length;
-    document.getElementById('statStuck').textContent = baseOwner.filter(FILTERS['stuck']).length;
-    document.getElementById('statCad1').textContent = baseOwner.filter(FILTERS['cadencia1']).length;
-    document.getElementById('statCad2').textContent = baseOwner.filter(FILTERS['cadencia2']).length;
-    const baseTransferidos = getBaseDeals('transferidos');
-    document.getElementById('statTransferidos').textContent = baseTransferidos.filter(FILTERS['transferidos']).length;
-}
-
-// ==================== CONFIG MODAL ====================
-function openConfig() {
-    const modal = document.getElementById('configModal');
-    modal.classList.add('active');
-
-    // Since we use SQL directly, the config modal shows info about the current field mappings
-    const fieldMappings = [
-        { name: 'Link da Conversa', hash: '3dda4dab1781dcfd8839a5fd6c0b7d5e7acfbcfc' },
-        { name: 'Step Cadencia', hash: '90db11111ad88f60a3346d04df252660832285ec' },
-        { name: 'Data Ultima Cadencia', hash: '85b830218feefa6ab8f7186f053a2d84b1b0bd2e' },
-        { name: 'Pular Cadencia', hash: '5502ecbc173d31de563ecb294e5f04e1394091e6' },
-        { name: 'Respondeu MIA', hash: '34336364766f24e1b2fdb25beec9c87856f3ade3' },
-    ];
-
-    // Populate selects with current values (read-only info)
-    const selects = [
-        { id: 'cfgLinkConversa', mapping: fieldMappings[0] },
-        { id: 'cfgStepCadencia', mapping: fieldMappings[1] },
-        { id: 'cfgDataCadencia', mapping: fieldMappings[2] },
-        { id: 'cfgPularCadencia', mapping: fieldMappings[3] },
-        { id: 'cfgRespondeuMia', mapping: fieldMappings[4] },
-    ];
-
-    selects.forEach(({ id, mapping }) => {
-        const sel = document.getElementById(id);
-        sel.innerHTML = `<option value="${mapping.hash}" selected>${mapping.name} (${mapping.hash.substring(0, 12)}...)</option>`;
-    });
-
-    const list = document.getElementById('fieldsList');
-    list.innerHTML = fieldMappings.map(f =>
-        `<div class="field-item"><span class="key">${escapeHtml(f.hash)}</span><span class="name">${escapeHtml(f.name)}</span></div>`
-    ).join('');
-}
-
-function closeConfig() { document.getElementById('configModal').classList.remove('active'); }
-
-async function saveConfig() {
-    closeConfig();
-    await refreshData();
+    applyFilters();
+    window.scrollTo({ top: document.querySelector('.section').offsetTop - 20, behavior: 'smooth' });
 }
 
 // ==================== EXPORT ====================
 function exportCSV() {
-    if (filteredDeals.length === 0) return;
-
-    const headers = ['Titulo', 'Pessoa', 'Organizacao', 'Funil', 'Estagio', 'Proprietario', 'Link Conversa', 'Step Cadencia', 'Data Cadencia', 'Pular Cadencia', 'Respondeu MIA', 'Criado em', 'Deal ID', 'Link Pipedrive'];
-    const rows = filteredDeals.map(d => [
-        d.title, d.person, d.org, d.pipeline, d.stage, d.owner,
-        d.link, d.stepCadencia, d.dataCadencia, d.pularCadencia,
-        d.respondeuMia, d.add_time, d.id,
-        `https://${SUBDOMAIN}.pipedrive.com/deal/${d.id}`
-    ]);
-
-    const csv = [headers, ...rows].map(row =>
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    var deals = getDealsForTab(currentTab, currentPipeline);
+    if (deals.length === 0) return;
+    var headers = ['Deal', 'Pessoa', 'Organizacao', 'Funil', 'Estagio', 'Proprietario', 'Link Conversa', 'Cadencia Step', 'Criado em', 'Link Pipedrive'];
+    var rows = deals.map(function(d) {
+        return [d.title, d.person, d.org, d.pipeline, d.stage, d.owner, d.link, d.stepCadencia, d.add_time, 'https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id];
+    });
+    var csv = [headers].concat(rows).map(function(row) {
+        return row.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\n');
+    var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
     a.href = url;
-    a.download = `deals_pipedrive_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = 'deals_' + currentTab + '_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
     URL.revokeObjectURL(url);
 }
 
-// ==================== DEBUG ====================
-function logDebug(msg, level = '') {
-    debugLogs.push({ msg, level });
-}
-
-function renderDebug() {
-    const panel = document.getElementById('debugPanel');
-    panel.innerHTML = debugLogs.map(l =>
-        `<div class="${l.level}">[${new Date().toLocaleTimeString('pt-BR')}] ${escapeHtml(l.msg)}</div>`
-    ).join('');
-}
-
-function toggleDebug() {
-    const panel = document.getElementById('debugPanel');
-    panel.classList.toggle('active');
-}
-
 // ==================== HELPERS ====================
-function showLoading(text) {
-    document.getElementById('loadingText').textContent = text;
-    document.getElementById('loading').classList.add('active');
-}
-
+function showLoading(t) { document.getElementById('loadingText').textContent = t; document.getElementById('loading').classList.add('active'); }
 function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+function showError(m) { var e = document.getElementById('errorBanner'); e.textContent = m; e.style.display = 'block'; setTimeout(function() { e.style.display = 'none'; }, 10000); }
+function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function trunc(s, n) { return s.length > n ? s.slice(0, n) + '...' : s; }
 
-function showError(msg) {
-    const el = document.getElementById('errorMsg');
-    el.textContent = msg;
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 10000);
-}
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function truncate(str, len) {
-    return str.length > len ? str.slice(0, len) + '...' : str;
-}
-
-// ==================== AUTO-REFRESH ====================
-// Refresh every 60 minutes
-setInterval(() => { refreshData(); }, 60 * 60 * 1000);
-
-// Schedule refresh at 8:00 AM every day
-function scheduleAt8AM() {
-    const now = new Date();
-    const next8 = new Date(now);
-    next8.setHours(8, 0, 0, 0);
-    if (now >= next8) next8.setDate(next8.getDate() + 1);
-    const ms = next8 - now;
-    setTimeout(() => {
-        refreshData();
-        setInterval(() => { refreshData(); }, 24 * 60 * 60 * 1000);
-    }, ms);
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    logDebug(`Proximo refresh automatico as 8h em ${h}h${m}m`);
-}
-scheduleAt8AM();
+// ==================== AUTO REFRESH ====================
+setInterval(refreshData, 60 * 60 * 1000);
 
 // ==================== INIT ====================
 refreshData();
