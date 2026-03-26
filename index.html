@@ -459,9 +459,18 @@ async function refreshData() {
             });
         } catch (e) { /* non-critical */ }
 
+        // Deduplica deals por ID
+        var seenIds = {};
+        var uniqueDeals = [];
+        rawDeals.forEach(function(d) {
+            if (seenIds[d.id]) return;
+            seenIds[d.id] = true;
+            uniqueDeals.push(d);
+        });
+
         // Filter: only deals created by Automacao or Morada
         allDeals = [];
-        rawDeals.forEach(function(d) {
+        uniqueDeals.forEach(function(d) {
             var rawCreator = d.creator_user_id;
             var creatorId = (typeof rawCreator === 'object' && rawCreator)
                 ? (rawCreator.id || rawCreator.value || rawCreator) : rawCreator;
