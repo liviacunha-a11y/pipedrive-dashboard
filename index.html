@@ -264,6 +264,7 @@
         <div class="sub" id="lastUpdated">Carregando...</div>
     </div>
     <div class="topbar-actions">
+        <span id="apiCounter" style="font-size:11px;color:#8b8fa3;background:#161825;padding:4px 10px;border-radius:6px;border:1px solid #2d3348;" title="Chamadas a API do Pipedrive nesta sessao">API: 0 calls</span>
         <button class="btn" onclick="refreshData()">&#8635; Atualizar</button>
         <button class="btn" onclick="exportCSV()">&#8681; CSV</button>
     </div>
@@ -372,6 +373,7 @@ var PAGE_SIZE = 50;
 var stages = {};
 var users = {};
 var cadenciaMap = {};
+var apiCallCount = 0;
 
 // ==================== PIPEDRIVE API ====================
 async function apiFetch(endpoint, params) {
@@ -380,6 +382,8 @@ async function apiFetch(endpoint, params) {
     url.searchParams.set('api_token', API_TOKEN);
     for (var k in params) url.searchParams.set(k, String(params[k]));
     var res = await fetch(url.toString());
+    apiCallCount++;
+    document.getElementById('apiCounter').textContent = 'API: ' + apiCallCount + ' calls';
     if (!res.ok) throw new Error('Pipedrive API ' + res.status);
     return res.json();
 }
@@ -405,6 +409,8 @@ async function apiFetchAll(endpoint, params) {
 
 // ==================== LOAD DATA ====================
 async function refreshData() {
+    apiCallCount = 0;
+    document.getElementById('apiCounter').textContent = 'API: 0 calls';
     showLoading('Conectando ao Pipedrive...');
     try {
         // Stages + Users in parallel
