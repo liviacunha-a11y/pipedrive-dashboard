@@ -239,35 +239,29 @@
 
 <div class="kpi-row">
     <div class="kpi-card red">
-        <div class="kpi-label">Grupos Duplicados</div>
+        <div class="kpi-label">Pessoas Duplicadas</div>
         <div class="kpi-value" id="kpiGroups">-</div>
-        <div class="kpi-sub">Grupos com 2+ deals</div>
+        <div class="kpi-sub">Pessoas com 2+ deals abertos</div>
     </div>
     <div class="kpi-card orange">
         <div class="kpi-label">Deals Duplicados</div>
         <div class="kpi-value" id="kpiDeals">-</div>
         <div class="kpi-sub">Total de deals em duplicidade</div>
     </div>
-    <div class="kpi-card purple">
-        <div class="kpi-label">Por Telefone</div>
-        <div class="kpi-value" id="kpiPhone">-</div>
-        <div class="kpi-sub">Grupos com mesmo telefone</div>
-    </div>
     <div class="kpi-card blue">
-        <div class="kpi-label">Por Email</div>
-        <div class="kpi-value" id="kpiEmail">-</div>
-        <div class="kpi-sub">Grupos com mesmo email</div>
+        <div class="kpi-label">Total Deals Abertos</div>
+        <div class="kpi-value" id="kpiTotal">-</div>
+        <div class="kpi-sub">Funil Vendas Spot</div>
     </div>
-</div>
-
-<div class="tabs">
-    <button class="tab active" onclick="setTab('all',this)">Todos</button>
-    <button class="tab" onclick="setTab('phone',this)">Por Telefone</button>
-    <button class="tab" onclick="setTab('email',this)">Por Email</button>
+    <div class="kpi-card purple">
+        <div class="kpi-label">Maior Duplicidade</div>
+        <div class="kpi-value" id="kpiMax">-</div>
+        <div class="kpi-sub">Mais deals para uma pessoa</div>
+    </div>
 </div>
 
 <div class="search-row">
-    <input type="text" class="search-box" placeholder="Buscar por nome, telefone, email..." oninput="onSearch(this.value)" />
+    <input type="text" class="search-box" placeholder="Buscar por nome, deal, proprietario..." oninput="onSearch(this.value)" />
 </div>
 
 <div class="error-banner" id="errorBanner"></div>
@@ -292,10 +286,11 @@ var API_DOMAIN = 'https://seazone-fd92b9.pipedrive.com';
 var SUBDOMAIN = 'seazone-fd92b9';
 var PIPELINE_ID = 28; // Vendas Spot
 
-var allGroups = []; // {key, type, deals[]}
-var currentTab = 'all';
+var allGroups = [];
+var totalDealsCount = 0;
 var searchTerm = '';
 var apiCallCount = 0;
+var stagesMap = {};
 
 // ==================== API ====================
 async function apiFetch(endpoint, params) {
@@ -331,153 +326,77 @@ async function apiFetchAll(endpoint, params, label) {
 }
 
 // ==================== DATA ====================
-function normalizePhone(phone) {
-    if (!phone) return '';
-    return phone.replace(/[\s\-\(\)\+\.]/g, '').replace(/^0+/, '');
-}
-
-function normalizeEmail(email) {
-    if (!email) return '';
-    return email.toLowerCase().trim();
-}
-
 async function refreshData() {
     apiCallCount = 0;
     document.getElementById('apiCounter').textContent = 'API: 0 calls';
-    showLoading('Carregando deals do Vendas Spot...');
+    showLoading('Carregando estagios...');
 
     try {
-        // Fetch all open deals
-        var rawDeals = await apiFetchAll('/deals', { pipeline_id: PIPELINE_ID, status: 'open' }, 'Deals');
-
-        showLoading('Carregando dados de pessoas...');
-
-        // Collect unique person IDs
-        var personIds = {};
-        rawDeals.forEach(function(d) {
-            var pid = typeof d.person_id === 'object' && d.person_id ? d.person_id.value : d.person_id;
-            if (pid) personIds[pid] = true;
-        });
-        var uniquePersonIds = Object.keys(personIds);
-
-        // Fetch person details in batches
-        var personMap = {};
-        var batchSize = 50;
-        for (var i = 0; i < uniquePersonIds.length; i += batchSize) {
-            var batch = uniquePersonIds.slice(i, i + batchSize);
-            showLoading('Carregando pessoas: ' + Math.min(i + batchSize, uniquePersonIds.length) + '/' + uniquePersonIds.length);
-            var promises = batch.map(function(pid) {
-                return apiFetch('/persons/' + pid).then(function(r) {
-                    if (r.success && r.data) personMap[r.data.id] = r.data;
-                }).catch(function() {});
-            });
-            await Promise.all(promises);
+        // Fetch stages
+        var stagesData = await apiFetch('/stages', { pipeline_id: PIPELINE_ID });
+        stagesMap = {};
+        if (stagesData.success && stagesData.data) {
+            stagesData.data.forEach(function(s) { stagesMap[s.id] = s.name; });
         }
 
-        showLoading('Analisando duplicados...');
+        // Fetch all open deals
+        showLoading('Carregando deals abertos do Vendas Spot...');
+        var rawDeals = await apiFetchAll('/deals', { pipeline_id: PIPELINE_ID, status: 'open' }, 'Deals');
+        totalDealsCount = rawDeals.length;
 
-        // Build deals array with phone/email
-        var deals = [];
+        showLoading('Agrupando por pessoa...');
+
+        // Group deals by person_id
+        var personGroups = {};
         rawDeals.forEach(function(d) {
-            var personId = typeof d.person_id === 'object' && d.person_id ? d.person_id.value : d.person_id;
+            var pid = typeof d.person_id === 'object' && d.person_id ? d.person_id.value : d.person_id;
+            if (!pid) return;
+
             var personName = typeof d.person_id === 'object' && d.person_id ? d.person_id.name : '';
-            var person = personMap[personId] || {};
             var ownerName = typeof d.user_id === 'object' && d.user_id ? d.user_id.name : '';
-            var orgName = typeof d.org_id === 'object' && d.org_id ? d.org_id.name : '';
-
-            // Extract phones
-            var phones = [];
-            if (person.phone) {
-                person.phone.forEach(function(p) {
-                    var n = normalizePhone(p.value);
-                    if (n && n.length >= 8) phones.push(n);
-                });
+            var personEmail = '';
+            if (typeof d.person_id === 'object' && d.person_id && d.person_id.email && d.person_id.email.length > 0) {
+                personEmail = d.person_id.email[0].value || '';
+            }
+            var personPhone = '';
+            if (typeof d.person_id === 'object' && d.person_id && d.person_id.phone && d.person_id.phone.length > 0) {
+                personPhone = d.person_id.phone[0].value || '';
             }
 
-            // Extract emails
-            var emails = [];
-            if (person.email) {
-                person.email.forEach(function(e) {
-                    var n = normalizeEmail(e.value);
-                    if (n && n.includes('@')) emails.push(n);
-                });
+            if (!personGroups[pid]) {
+                personGroups[pid] = { personId: pid, personName: personName, personEmail: personEmail, personPhone: personPhone, deals: [] };
             }
+            // Update name/email/phone if empty
+            var g = personGroups[pid];
+            if (!g.personName && personName) g.personName = personName;
+            if (!g.personEmail && personEmail) g.personEmail = personEmail;
+            if (!g.personPhone && personPhone) g.personPhone = personPhone;
 
-            var stageId = d.stage_id;
-
-            deals.push({
+            g.deals.push({
                 id: d.id,
                 title: d.title || '',
-                person: personName || (person.name || ''),
-                org: orgName,
                 owner: ownerName,
-                stage: d.stage_id,
-                phones: phones,
-                emails: emails,
+                stage: stagesMap[d.stage_id] || 'Stage ' + d.stage_id,
                 add_time: d.add_time || '',
                 value: d.value || 0,
             });
         });
 
-        // Find duplicates by phone
-        var phoneGroups = {};
-        deals.forEach(function(d) {
-            d.phones.forEach(function(phone) {
-                if (!phoneGroups[phone]) phoneGroups[phone] = [];
-                if (!phoneGroups[phone].some(function(x) { return x.id === d.id; })) {
-                    phoneGroups[phone].push(d);
-                }
-            });
-        });
-
-        // Find duplicates by email
-        var emailGroups = {};
-        deals.forEach(function(d) {
-            d.emails.forEach(function(email) {
-                if (!emailGroups[email]) emailGroups[email] = [];
-                if (!emailGroups[email].some(function(x) { return x.id === d.id; })) {
-                    emailGroups[email].push(d);
-                }
-            });
-        });
-
-        // Build groups (only where 2+ deals)
+        // Filter: only groups with 2+ deals
         allGroups = [];
-        var seenGroupKeys = {};
-
-        for (var phone in phoneGroups) {
-            if (phoneGroups[phone].length >= 2) {
-                var key = 'phone:' + phone;
-                seenGroupKeys[key] = true;
-                allGroups.push({
-                    key: phone,
-                    displayKey: formatPhone(phone),
-                    type: 'phone',
-                    deals: phoneGroups[phone],
-                });
+        for (var pid in personGroups) {
+            if (personGroups[pid].deals.length >= 2) {
+                allGroups.push(personGroups[pid]);
             }
         }
 
-        for (var email in emailGroups) {
-            if (emailGroups[email].length >= 2) {
-                var key = 'email:' + email;
-                seenGroupKeys[key] = true;
-                allGroups.push({
-                    key: email,
-                    displayKey: email,
-                    type: 'email',
-                    deals: emailGroups[email],
-                });
-            }
-        }
-
-        // Sort: most duplicates first
+        // Sort: most deals first
         allGroups.sort(function(a, b) { return b.deals.length - a.deals.length; });
 
         updateKPIs();
         renderGroups();
         hideLoading();
-        document.getElementById('lastUpdated').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + ' | ' + deals.length + ' deals analisados | ' + Object.keys(personMap).length + ' pessoas';
+        document.getElementById('lastUpdated').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + ' | ' + totalDealsCount + ' deals analisados';
     } catch (e) {
         hideLoading();
         showError('Erro: ' + e.message);
@@ -485,37 +404,19 @@ async function refreshData() {
     }
 }
 
-function formatPhone(phone) {
-    if (phone.length === 13) return '+' + phone.slice(0,2) + ' (' + phone.slice(2,4) + ') ' + phone.slice(4,9) + '-' + phone.slice(9);
-    if (phone.length === 12) return '+' + phone.slice(0,2) + ' (' + phone.slice(2,4) + ') ' + phone.slice(4,8) + '-' + phone.slice(8);
-    if (phone.length === 11) return '(' + phone.slice(0,2) + ') ' + phone.slice(2,7) + '-' + phone.slice(7);
-    if (phone.length === 10) return '(' + phone.slice(0,2) + ') ' + phone.slice(2,6) + '-' + phone.slice(6);
-    return phone;
-}
-
 // ==================== UI ====================
 function updateKPIs() {
-    var phoneGroups = allGroups.filter(function(g) { return g.type === 'phone'; });
-    var emailGroups = allGroups.filter(function(g) { return g.type === 'email'; });
-    var totalDeals = 0;
-    var seenDeals = {};
+    var totalDupDeals = 0;
+    var maxDeals = 0;
     allGroups.forEach(function(g) {
-        g.deals.forEach(function(d) {
-            if (!seenDeals[d.id]) { seenDeals[d.id] = true; totalDeals++; }
-        });
+        totalDupDeals += g.deals.length;
+        if (g.deals.length > maxDeals) maxDeals = g.deals.length;
     });
 
     document.getElementById('kpiGroups').textContent = allGroups.length;
-    document.getElementById('kpiDeals').textContent = totalDeals;
-    document.getElementById('kpiPhone').textContent = phoneGroups.length;
-    document.getElementById('kpiEmail').textContent = emailGroups.length;
-}
-
-function setTab(tab, btn) {
-    currentTab = tab;
-    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-    if (btn) btn.classList.add('active');
-    renderGroups();
+    document.getElementById('kpiDeals').textContent = totalDupDeals;
+    document.getElementById('kpiTotal').textContent = totalDealsCount;
+    document.getElementById('kpiMax').textContent = maxDeals || '-';
 }
 
 function onSearch(val) {
@@ -525,16 +426,13 @@ function onSearch(val) {
 
 function getFilteredGroups() {
     var groups = allGroups;
-    if (currentTab === 'phone') groups = groups.filter(function(g) { return g.type === 'phone'; });
-    if (currentTab === 'email') groups = groups.filter(function(g) { return g.type === 'email'; });
-
     if (searchTerm) {
         groups = groups.filter(function(g) {
-            if (g.key.toLowerCase().indexOf(searchTerm) !== -1) return true;
-            if (g.displayKey.toLowerCase().indexOf(searchTerm) !== -1) return true;
+            if (g.personName.toLowerCase().indexOf(searchTerm) !== -1) return true;
+            if (g.personEmail.toLowerCase().indexOf(searchTerm) !== -1) return true;
+            if (g.personPhone.indexOf(searchTerm) !== -1) return true;
             return g.deals.some(function(d) {
                 return d.title.toLowerCase().indexOf(searchTerm) !== -1 ||
-                    d.person.toLowerCase().indexOf(searchTerm) !== -1 ||
                     d.owner.toLowerCase().indexOf(searchTerm) !== -1;
             });
         });
@@ -544,9 +442,8 @@ function getFilteredGroups() {
 
 function renderGroups() {
     var groups = getFilteredGroups();
-    var titles = { all: 'Todos os Duplicados', phone: 'Duplicados por Telefone', email: 'Duplicados por Email' };
-    document.getElementById('sectionTitle').textContent = titles[currentTab] || '';
-    document.getElementById('sectionCount').textContent = groups.length + ' grupo(s)';
+    document.getElementById('sectionTitle').textContent = 'Pessoas com Deals Duplicados';
+    document.getElementById('sectionCount').textContent = groups.length + ' pessoa(s)';
 
     var container = document.getElementById('groupsContainer');
     if (groups.length === 0) {
@@ -557,32 +454,33 @@ function renderGroups() {
     document.getElementById('emptyState').style.display = 'none';
 
     container.innerHTML = groups.map(function(g, idx) {
-        var typeBadge = g.type === 'phone'
-            ? '<span class="dup-type-badge dup-type-phone">Telefone</span>'
-            : '<span class="dup-type-badge dup-type-email">Email</span>';
+        var info = '';
+        if (g.personPhone) info += '<span class="dup-type-badge dup-type-phone">' + esc(g.personPhone) + '</span>';
+        if (g.personEmail) info += '<span class="dup-type-badge dup-type-email">' + esc(g.personEmail) + '</span>';
 
         var rows = g.deals.map(function(d) {
             var date = d.add_time ? new Date(d.add_time).toLocaleDateString('pt-BR') : '-';
-            var phones = d.phones.join(', ') || '-';
-            var emails = d.emails.join(', ') || '-';
             return '<tr>' +
-                '<td><a class="link-deal" href="https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id + '" target="_blank">' + esc(trunc(d.title, 30)) + '</a></td>' +
-                '<td>' + esc(trunc(d.person, 25)) + '</td>' +
-                '<td>' + esc(phones) + '</td>' +
-                '<td>' + esc(trunc(emails, 30)) + '</td>' +
-                '<td><span class="badge badge-gray">' + esc(trunc(d.owner, 18)) + '</span></td>' +
+                '<td><a class="link-deal" href="https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id + '" target="_blank">' + d.id + '</a></td>' +
+                '<td>' + esc(trunc(d.title, 35)) + '</td>' +
+                '<td>' + esc(d.stage) + '</td>' +
+                '<td><span class="badge badge-gray">' + esc(trunc(d.owner, 20)) + '</span></td>' +
+                '<td>' + (d.value ? 'R$ ' + Number(d.value).toLocaleString('pt-BR') : '-') + '</td>' +
                 '<td>' + date + '</td>' +
                 '</tr>';
         }).join('');
 
         return '<div class="dup-group">' +
             '<div class="dup-group-header" onclick="toggleGroup(' + idx + ')">' +
-                '<div><span class="dup-key">' + esc(g.displayKey) + '</span>' + typeBadge + '</div>' +
+                '<div>' +
+                    '<span class="dup-key">' + esc(g.personName || 'Sem nome') + '</span>' +
+                    info +
+                '</div>' +
                 '<span class="dup-count">' + g.deals.length + ' deals</span>' +
             '</div>' +
             '<div id="group-' + idx + '">' +
                 '<table><thead><tr>' +
-                    '<th>Deal</th><th>Pessoa</th><th>Telefone(s)</th><th>Email(s)</th><th>Proprietario</th><th>Criado em</th>' +
+                    '<th>ID</th><th>Deal</th><th>Estagio</th><th>Proprietario</th><th>Valor</th><th>Criado em</th>' +
                 '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '</div>' +
         '</div>';
@@ -599,11 +497,11 @@ function toggleGroup(idx) {
 function exportCSV() {
     var groups = getFilteredGroups();
     if (groups.length === 0) return;
-    var headers = ['Grupo', 'Tipo', 'Chave', 'Deal ID', 'Deal', 'Pessoa', 'Telefone(s)', 'Email(s)', 'Proprietario', 'Criado em', 'Link Pipedrive'];
+    var headers = ['Pessoa', 'Telefone', 'Email', 'Qtd Deals', 'Deal ID', 'Deal', 'Estagio', 'Proprietario', 'Valor', 'Criado em', 'Link Pipedrive'];
     var rows = [];
-    groups.forEach(function(g, i) {
+    groups.forEach(function(g) {
         g.deals.forEach(function(d) {
-            rows.push([i + 1, g.type, g.key, d.id, d.title, d.person, d.phones.join('; '), d.emails.join('; '), d.owner, d.add_time, 'https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id]);
+            rows.push([g.personName, g.personPhone, g.personEmail, g.deals.length, d.id, d.title, d.stage, d.owner, d.value, d.add_time, 'https://' + SUBDOMAIN + '.pipedrive.com/deal/' + d.id]);
         });
     });
     var csv = [headers].concat(rows).map(function(row) {
