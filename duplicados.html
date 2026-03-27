@@ -227,7 +227,7 @@
 
 <div class="topbar">
     <div>
-        <h1>Deals Duplicados - Vendas Spot</h1>
+        <h1>Deals Duplicados</h1>
         <div class="sub" id="lastUpdated">Carregando...</div>
     </div>
     <div class="topbar-actions">
@@ -235,6 +235,11 @@
         <button class="btn" onclick="refreshData()">&#8635; Atualizar</button>
         <button class="btn" onclick="exportCSV()">&#8681; CSV</button>
     </div>
+</div>
+
+<div class="tabs" style="padding: 16px 24px;">
+    <button class="tab active" id="tabSpot" onclick="switchPipeline(28, this)">Vendas Spot</button>
+    <button class="tab" id="tabMkt" onclick="switchPipeline(37, this)">Marketplace</button>
 </div>
 
 <div class="kpi-row">
@@ -251,7 +256,7 @@
     <div class="kpi-card blue">
         <div class="kpi-label">Total Deals Abertos</div>
         <div class="kpi-value" id="kpiTotal">-</div>
-        <div class="kpi-sub">Funil Vendas Spot</div>
+        <div class="kpi-sub" id="kpiTotalSub">-</div>
     </div>
     <div class="kpi-card purple">
         <div class="kpi-label">Maior Duplicidade</div>
@@ -261,7 +266,7 @@
 </div>
 
 <div class="search-row">
-    <input type="text" class="search-box" placeholder="Buscar por nome, deal, proprietario..." oninput="onSearch(this.value)" />
+    <input type="text" class="search-box" id="searchInput" placeholder="Buscar por nome, deal, proprietario..." oninput="onSearch(this.value)" />
 </div>
 
 <div class="error-banner" id="errorBanner"></div>
@@ -284,8 +289,12 @@
 var API_TOKEN = '4180d0bccc08eff4be87fd159024a0b7e26b3616';
 var API_DOMAIN = 'https://seazone-fd92b9.pipedrive.com';
 var SUBDOMAIN = 'seazone-fd92b9';
-var PIPELINE_ID = 28; // Vendas Spot
 
+var PIPELINES = { 28: 'Vendas Spot', 37: 'Marketplace' };
+var activePipeline = 28;
+
+// Cache por pipeline
+var cache = {};
 var allGroups = [];
 var totalDealsCount = 0;
 var searchTerm = '';
@@ -326,24 +335,45 @@ async function apiFetchAll(endpoint, params, label) {
 }
 
 // ==================== DATA ====================
+function switchPipeline(pipelineId, btn) {
+    activePipeline = pipelineId;
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    searchTerm = '';
+    document.getElementById('searchInput').value = '';
+
+    // Use cache if available
+    if (cache[pipelineId]) {
+        allGroups = cache[pipelineId].groups;
+        totalDealsCount = cache[pipelineId].total;
+        stagesMap = cache[pipelineId].stages;
+        updateKPIs();
+        renderGroups();
+        document.getElementById('lastUpdated').textContent = cache[pipelineId].updatedText;
+    } else {
+        refreshData();
+    }
+}
+
 async function refreshData() {
     apiCallCount = 0;
     document.getElementById('apiCounter').textContent = 'API: 0 calls';
-    showLoading('Carregando estagios...');
+    var pipelineName = PIPELINES[activePipeline] || 'Pipeline ' + activePipeline;
+    showLoading('Carregando estagios ' + pipelineName + '...');
 
     try {
         // Fetch stages
-        var stagesData = await apiFetch('/stages', { pipeline_id: PIPELINE_ID });
+        var stagesData = await apiFetch('/stages', { pipeline_id: activePipeline });
         stagesMap = {};
         if (stagesData.success && stagesData.data) {
             stagesData.data.forEach(function(s) { stagesMap[s.id] = s.name; });
         }
 
         // Fetch all open deals
-        showLoading('Carregando deals abertos do Vendas Spot...');
-        var allDeals = await apiFetchAll('/deals', { pipeline_id: PIPELINE_ID, status: 'open' }, 'Deals');
-        // Filtro extra no JS para garantir que so pega Vendas Spot (pipeline 28)
-        var rawDeals = allDeals.filter(function(d) { return d.pipeline_id === PIPELINE_ID; });
+        showLoading('Carregando deals abertos - ' + pipelineName + '...');
+        var allDeals = await apiFetchAll('/deals', { pipeline_id: activePipeline, status: 'open' }, 'Deals');
+        // Filtro extra no JS para garantir pipeline correto
+        var rawDeals = allDeals.filter(function(d) { return d.pipeline_id === activePipeline; });
         totalDealsCount = rawDeals.length;
 
         showLoading('Agrupando por pessoa...');
@@ -368,7 +398,6 @@ async function refreshData() {
             if (!personGroups[pid]) {
                 personGroups[pid] = { personId: pid, personName: personName, personEmail: personEmail, personPhone: personPhone, deals: [] };
             }
-            // Update name/email/phone if empty
             var g = personGroups[pid];
             if (!g.personName && personName) g.personName = personName;
             if (!g.personEmail && personEmail) g.personEmail = personEmail;
@@ -395,10 +424,14 @@ async function refreshData() {
         // Sort: most deals first
         allGroups.sort(function(a, b) { return b.deals.length - a.deals.length; });
 
+        // Save to cache
+        var updatedText = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + ' | ' + pipelineName + ' | ' + totalDealsCount + ' deals analisados';
+        cache[activePipeline] = { groups: allGroups, total: totalDealsCount, stages: stagesMap, updatedText: updatedText };
+
         updateKPIs();
         renderGroups();
         hideLoading();
-        document.getElementById('lastUpdated').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + ' | ' + totalDealsCount + ' deals analisados';
+        document.getElementById('lastUpdated').textContent = updatedText;
     } catch (e) {
         hideLoading();
         showError('Erro: ' + e.message);
@@ -418,6 +451,7 @@ function updateKPIs() {
     document.getElementById('kpiGroups').textContent = allGroups.length;
     document.getElementById('kpiDeals').textContent = totalDupDeals;
     document.getElementById('kpiTotal').textContent = totalDealsCount;
+    document.getElementById('kpiTotalSub').textContent = PIPELINES[activePipeline] || '';
     document.getElementById('kpiMax').textContent = maxDeals || '-';
 }
 
@@ -513,7 +547,8 @@ function exportCSV() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'deals_duplicados_vendas_spot_' + new Date().toISOString().slice(0, 10) + '.csv';
+    var pipeName = (PIPELINES[activePipeline] || 'pipeline').toLowerCase().replace(/\s+/g, '_');
+    a.download = 'deals_duplicados_' + pipeName + '_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
     URL.revokeObjectURL(url);
 }
