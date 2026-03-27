@@ -341,7 +341,9 @@ async function refreshData() {
 
         // Fetch all open deals
         showLoading('Carregando deals abertos do Vendas Spot...');
-        var rawDeals = await apiFetchAll('/deals', { pipeline_id: PIPELINE_ID, status: 'open' }, 'Deals');
+        var allDeals = await apiFetchAll('/deals', { pipeline_id: PIPELINE_ID, status: 'open' }, 'Deals');
+        // Filtro extra no JS para garantir que so pega Vendas Spot (pipeline 28)
+        var rawDeals = allDeals.filter(function(d) { return d.pipeline_id === PIPELINE_ID; });
         totalDealsCount = rawDeals.length;
 
         showLoading('Agrupando por pessoa...');
