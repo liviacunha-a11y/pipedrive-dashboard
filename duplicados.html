@@ -240,6 +240,8 @@
 <div class="tabs" style="padding: 16px 24px;">
     <button class="tab active" id="tabSpot" onclick="switchPipeline(28, this)">Vendas Spot</button>
     <button class="tab" id="tabMkt" onclick="switchPipeline(37, this)">Marketplace</button>
+    <button class="tab" id="tabDecor" onclick="switchPipeline(44, this)">Comercial Decor</button>
+    <button class="tab" id="tabSzs" onclick="switchPipeline(14, this)">Comercial SZS</button>
 </div>
 
 <div class="kpi-row">
@@ -290,7 +292,7 @@ var API_TOKEN = '4180d0bccc08eff4be87fd159024a0b7e26b3616';
 var API_DOMAIN = 'https://seazone-fd92b9.pipedrive.com';
 var SUBDOMAIN = 'seazone-fd92b9';
 
-var PIPELINES = { 28: 'Vendas Spot', 37: 'Marketplace' };
+var PIPELINES = { 28: 'Vendas Spot', 37: 'Marketplace', 44: 'Comercial Decor', 14: 'Comercial SZS' };
 var activePipeline = 28;
 
 // Cache por pipeline
